@@ -1,0 +1,19 @@
+@baseUrl=http://localhost:3000
+
+### Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username":"admin",
+  "password":"Password@123"
+}
+
+> {%
+client.global.set("token", response.body.accessToken);
+%}
+
+###
+
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}

@@ -1,0 +1,2 @@
+import { IsISO8601, IsOptional, IsString, MaxLength } from 'class-validator';
+export class CreateDocumentDto { @IsOptional() @IsString() vehicleId?: string; @IsOptional() @IsString() driverId?: string; @IsString() @MaxLength(150) name: string; @IsOptional() @IsString() @MaxLength(80) documentType?: string; @IsString() @MaxLength(500) fileUrl: string; @IsOptional() @IsISO8601() expiresAt?: string; }

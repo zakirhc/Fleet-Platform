@@ -1,0 +1,26 @@
+@baseUrl=http://localhost:3000
+
+### Create User
+
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+    "companyId":1,
+    "username":"admin",
+    "password":"Password@123",
+    "email":"admin@example.com",
+    "fullName":"System Administrator"
+}
+
+###
+
+### List Users
+
+GET {{baseUrl}}/users
+
+###
+
+### Get User
+
+GET {{baseUrl}}/users/1

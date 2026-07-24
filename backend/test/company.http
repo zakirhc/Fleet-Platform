@@ -1,0 +1,27 @@
+@baseUrl=http://localhost:3000
+
+### Create Company
+
+POST {{baseUrl}}/company
+Content-Type: application/json
+
+{
+    "code":"ARC",
+    "name":"Arc Bangladesh Ltd.",
+    "email":"info@arc.com",
+    "phone":"01711111111",
+    "address":"Dhaka",
+    "website":"https://arc.com"
+}
+
+###
+
+### List Companies
+
+GET {{baseUrl}}/company
+
+###
+
+### Get Company by ID
+
+GET {{baseUrl}}/company/1

@@ -1,0 +1,43 @@
+{
+  "name": "fleet-platform",
+  "version": "1.0.0",
+  "description": "nodejs app on docker container",
+  "homepage": "https://github.com/zakirhc/Fleet-Platform#readme",
+  "bugs": {
+    "url": "https://github.com/zakirhc/Fleet-Platform/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://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@github.com/zakirhc/Fleet-Platform.git"
+  },
+  "license": "ISC",
+  "author": "Zakir Hossain Chowdhury",
+  "type": "commonjs",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.28",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/core": "^11.1.28",
+    "@nestjs/platform-express": "^11.1.28",
+    "@nestjs/swagger": "^11.4.5",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.24",
+    "@nestjs/schematics": "^11.1.0",
+    "@nestjs/testing": "^11.1.28",
+    "@types/node": "^26.1.1",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^7.0.2"
+  }
+}

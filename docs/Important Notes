@@ -1,0 +1,23 @@
+{
+    "username": "admin",
+    "password": "Password@123"
+  }'
+
+npm run start:dev
+port 8000
+cd frontend && npm run dev
+port 5173
+
+
+
+✅ Driver module
+✅ Vehicle assignment
+✅ Trips
+✅ Fuel
+✅ Maintenance
+✅ Dashboard
+✅ WhatsApp integration
+✅ React frontend
+✅ Docker updates
+✅ Tests
+✅ Documentation

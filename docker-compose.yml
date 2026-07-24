@@ -1,0 +1,67 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    env_file: .env.docker
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u\"$$MYSQL_USER\" -p\"$$MYSQL_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  traccar:
+    image: traccar/traccar:6.14.5-alpine
+    restart: unless-stopped
+    env_file: .env.docker
+    environment:
+      CONFIG_USE_ENVIRONMENT_VARIABLES: "true"
+      DATABASE_DRIVER: ${TRACCAR_DATABASE_DRIVER:?Set TRACCAR_DATABASE_DRIVER in .env.docker}
+      DATABASE_URL: ${TRACCAR_DATABASE_URL:?Set TRACCAR_DATABASE_URL in .env.docker}
+      DATABASE_USER: ${TRACCAR_DATABASE_USER:?Set TRACCAR_DATABASE_USER in .env.docker}
+      DATABASE_PASSWORD: ${TRACCAR_DATABASE_PASSWORD:?Set TRACCAR_DATABASE_PASSWORD in .env.docker}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+      # Teltonika is enabled as a practical default. Add only the protocol ports
+      # used by your trackers rather than exposing Traccar's entire port range.
+      - "5027:5027"
+      - "5027:5027/udp"
+    volumes:
+      - traccar-data:/opt/traccar/data
+      - traccar-logs:/opt/traccar/logs
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: .env.docker
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/ready').then(response => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+
+volumes:
+  mysql-data:
+  traccar-data:
+  traccar-logs:

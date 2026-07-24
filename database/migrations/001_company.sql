@@ -1,0 +1,24 @@
+CREATE TABLE fm_company (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    uuid CHAR(36) NOT NULL,
+    code VARCHAR(20) NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    email VARCHAR(150) NULL,
+    phone VARCHAR(30) NULL,
+    address VARCHAR(255) NULL,
+    website VARCHAR(150) NULL,
+    timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Dhaka',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_company_uuid (uuid),
+    UNIQUE KEY uk_company_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE fm_schema_version (
+    version INT NOT NULL,
+    description VARCHAR(255) NOT NULL,
+    installed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (version)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
