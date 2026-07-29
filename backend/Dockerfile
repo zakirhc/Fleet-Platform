@@ -4,7 +4,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-RUN npx prisma generate && npm run build
+# Prisma only needs a syntactically valid URL to generate the client. The real
+# DATABASE_URL is supplied by Docker Compose when the application runs.
+RUN DATABASE_URL="mysql://build:build@localhost:3306/build" npx prisma generate && npm run build
 
 FROM node:22-bookworm-slim AS production
 
