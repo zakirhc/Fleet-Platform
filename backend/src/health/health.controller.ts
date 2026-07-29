@@ -21,6 +21,10 @@ export class HealthController {
   }
 
   @Get()
+  async health() {
+    return this.ready();
+  }
+
   @Get('ready')
   async ready() {
     await this.prisma.$queryRaw`SELECT 1`;
