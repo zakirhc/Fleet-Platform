@@ -19,8 +19,11 @@ import com.biapps.fleet.data.GeofenceEvent
 import com.biapps.fleet.data.LiveVehicle
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import org.maplibre.android.MapLibre
 import org.maplibre.android.WellKnownTileServer
 import org.maplibre.android.annotations.MarkerOptions
@@ -78,6 +81,7 @@ class AuthViewModel : ViewModel() {
 }
 
 @Composable private fun LiveMap(vehicles: List<LiveVehicle>) {
+  val lifecycleOwner = LocalLifecycleOwner.current
   var mapView by remember { mutableStateOf<MapView?>(null) }
   var map by remember { mutableStateOf<MapLibreMap?>(null) }
   var mapReady by remember { mutableStateOf(false) }
@@ -100,11 +104,26 @@ class AuthViewModel : ViewModel() {
   Column {
     AndroidView(
       modifier = Modifier.fillMaxWidth().height(280.dp),
-      factory = { context -> MapLibre.getInstance(context.applicationContext, BuildConfig.MAPTILER_API_KEY, WellKnownTileServer.MapTiler); MapView(context, MapLibreMapOptions().textureMode(true)).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); post { onStart(); onResume(); getMapAsync { loadedMap -> map = loadedMap; mapStatus = "Map engine ready — loading style…"; loadedMap.setStyle(mapStyle()) { mapReady = true; mapStatus = "Map style loaded" } } }; mapView = this } },
+      factory = { context -> MapLibre.getInstance(context.applicationContext, BuildConfig.MAPTILER_API_KEY, WellKnownTileServer.MapTiler); MapView(context, MapLibreMapOptions().textureMode(true)).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); getMapAsync { loadedMap -> map = loadedMap; mapStatus = "Map engine ready — loading style…"; loadedMap.setStyle(mapStyle()) { mapReady = true; mapStatus = "Map style loaded" } }; mapStatus = "Map view created — waiting for Android lifecycle…"; mapView = this } },
     )
     Text(mapError?.let { "Map error: $it" } ?: mapStatus, color = if (mapError == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
   }
-  DisposableEffect(mapView) { onDispose { mapView?.onPause(); mapView?.onStop(); mapView?.onDestroy() } }
+  DisposableEffect(lifecycleOwner, mapView) {
+    val view = mapView ?: return@DisposableEffect onDispose { }
+    val observer = LifecycleEventObserver { _, event ->
+      when (event) {
+        Lifecycle.Event.ON_START -> view.onStart()
+        Lifecycle.Event.ON_RESUME -> view.onResume()
+        Lifecycle.Event.ON_PAUSE -> view.onPause()
+        Lifecycle.Event.ON_STOP -> view.onStop()
+        else -> Unit
+      }
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) view.onStart()
+    if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) view.onResume()
+    onDispose { lifecycleOwner.lifecycle.removeObserver(observer); view.onPause(); view.onStop(); view.onDestroy() }
+  }
 }
 
 private const val OSM_RASTER_STYLE = """
