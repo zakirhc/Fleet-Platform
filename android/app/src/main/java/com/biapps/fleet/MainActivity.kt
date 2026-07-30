@@ -1,11 +1,6 @@
 package com.biapps.fleet
 
 import android.os.Bundle
-import android.view.View
-import android.webkit.ConsoleMessage
-import android.webkit.WebView
-import android.webkit.WebChromeClient
-import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
@@ -26,8 +21,12 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import org.json.JSONArray
-import org.json.JSONObject
+import org.maplibre.android.MapLibre
+import org.maplibre.android.annotations.MarkerOptions
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapView
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { FleetApp() } }
@@ -76,29 +75,29 @@ class AuthViewModel : ViewModel() {
 }
 
 @Composable private fun LiveMap(vehicles: List<LiveVehicle>) {
-  var webView by remember { mutableStateOf<WebView?>(null) }
+  var mapView by remember { mutableStateOf<MapView?>(null) }
+  var map by remember { mutableStateOf<MapLibreMap?>(null) }
   var mapReady by remember { mutableStateOf(false) }
-  var mapError by remember { mutableStateOf<String?>(null) }
-  val payload = remember(vehicles) { mapPayload(vehicles) }
-  LaunchedEffect(webView, mapReady, payload) { if (mapReady) webView?.evaluateJavascript("window.setVehicles($payload);", null) }
-  Column {
-    AndroidView(
-      modifier = Modifier.fillMaxWidth().height(280.dp),
-      factory = { context -> WebView(context).apply { settings.javaScriptEnabled = true; settings.domStorageEnabled = true; settings.allowFileAccess = true; settings.allowContentAccess = true; webChromeClient = object : WebChromeClient() { override fun onConsoleMessage(message: ConsoleMessage): Boolean { if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR) mapError = "Map could not load: ${message.message()}"; return true } }; webViewClient = object : WebViewClient() { override fun onPageFinished(view: WebView?, url: String?) { mapReady = true } }; loadUrl("file:///android_asset/map.html"); webView = this } },
-    )
-    mapError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
+  LaunchedEffect(map, mapReady, vehicles) {
+    val activeMap = map ?: return@LaunchedEffect
+    if (!mapReady) return@LaunchedEffect
+    activeMap.clear()
+    val points = vehicles.mapNotNull { vehicle ->
+      val latitude = vehicle.latitude ?: return@mapNotNull null
+      val longitude = vehicle.longitude ?: return@mapNotNull null
+      LatLng(latitude, longitude).also { point ->
+        activeMap.addMarker(MarkerOptions().position(point).title(vehicle.registrationNo).snippet("${vehicle.speed ?: 0.0} km/h · ${vehicle.fixTime ?: "Unknown time"}"))
+      }
+    }
+    if (points.size == 1) activeMap.animateCamera(CameraUpdateFactory.newLatLngZoom(points.first(), 15.0))
+    else if (points.isNotEmpty()) activeMap.animateCamera(CameraUpdateFactory.newLatLngBounds(org.maplibre.android.geometry.LatLngBounds.fromLatLngs(points), 48))
   }
+  AndroidView(
+    modifier = Modifier.fillMaxWidth().height(280.dp),
+    factory = { context -> MapView(context).apply { MapLibre.getInstance(context.applicationContext); onCreate(null); onStart(); getMapAsync { loadedMap -> map = loadedMap; loadedMap.setStyle("https://demotiles.maplibre.org/style.json") { mapReady = true } }; mapView = this } },
+  )
+  DisposableEffect(mapView) { onDispose { mapView?.onStop(); mapView?.onDestroy() } }
 }
-
-private fun mapPayload(vehicles: List<LiveVehicle>): String = JSONArray().apply {
-  vehicles.filter { it.latitude != null && it.longitude != null }.forEach { vehicle ->
-    put(JSONObject().put("id", vehicle.id).put("name", vehicle.registrationNo).put("latitude", vehicle.latitude).put("longitude", vehicle.longitude).put("speed", vehicle.speed ?: 0.0).put("fixTime", vehicle.fixTime ?: "Unknown time"))
-  }
-}.toString()
-
-private const val LEAFLET_MAP_HTML = """
-<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="leaflet.css"><style>html,body,#map{height:100%;margin:0;background:#e8edf2}.leaflet-popup-content{font:14px sans-serif}.loading{padding:16px;font:14px sans-serif;color:#374151}</style></head><body><div id="map"><div class="loading">Loading live map…</div></div><script src="leaflet.js"></script><script>const map=L.map('map').setView([23.8103,90.4125],7);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);const markers={};window.setVehicles=function(items){const ids=new Set(items.map(x=>x.id));Object.keys(markers).forEach(id=>{if(!ids.has(id)){map.removeLayer(markers[id]);delete markers[id]}});const points=[];items.forEach(x=>{const popup='<b>'+x.name+'</b><br>'+x.speed.toFixed(1)+' km/h<br>'+x.fixTime;if(markers[x.id]){markers[x.id].setLatLng([x.latitude,x.longitude]).setPopupContent(popup)}else{markers[x.id]=L.circleMarker([x.latitude,x.longitude],{radius:8,color:'#0f766e',fillColor:'#14b8a6',fillOpacity:1}).addTo(map).bindPopup(popup)}points.push([x.latitude,x.longitude])});if(points.length===1)map.setView(points[0],15);else if(points.length>1)map.fitBounds(points,{padding:[24,24],maxZoom:15})};</script></body></html>
-"""
 
 @Composable private fun AlertsScreen(session: Session) {
   var events by remember(session.accessToken) { mutableStateOf<List<GeofenceEvent>>(emptyList()) }
