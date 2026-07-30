@@ -20,9 +20,14 @@ class FleetApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/
       setRequestProperty("Content-Type", "application/json"); doOutput = true
       outputStream.use { it.write(body.toString().toByteArray()) }
     }
-    val text = (if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream).bufferedReader().use { it.readText() }
+    val status = connection.responseCode
+    val text = (if (status in 200..299) connection.inputStream else connection.errorStream)
+      .bufferedReader().use { it.readText() }
+    if (text.trimStart().startsWith("<")) {
+      throw IllegalStateException("$path returned an HTML page instead of the Fleet API. Check FLEET_API_BASE_URL: $baseUrl")
+    }
     val envelope = JSONObject(text)
-    if (connection.responseCode !in 200..299 || !envelope.optBoolean("success")) throw IllegalStateException(envelope.optString("message", "Request failed."))
+    if (status !in 200..299 || !envelope.optBoolean("success")) throw IllegalStateException(envelope.optString("message", "Request failed."))
     envelope.getJSONObject("data")
   }
 }
