@@ -7,6 +7,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -26,6 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -86,26 +90,31 @@ class AuthViewModel : ViewModel() {
 }
 
 @Composable private fun LiveMap(vehicles: List<LiveVehicle>) {
-  val vehicle = vehicles.firstOrNull { it.latitude != null && it.longitude != null }
+  val locatedVehicles = vehicles.filter { it.latitude != null && it.longitude != null }
+  val locationSignature = locatedVehicles.joinToString { "${it.id}:${it.latitude}:${it.longitude}" }
+  val mapCenter = locatedVehicles.takeIf { it.isNotEmpty() }?.let { items -> MapLocation(items.map { it.latitude!! }.average(), items.map { it.longitude!! }.average()) }
   var zoom by remember { mutableIntStateOf(DEFAULT_MAP_ZOOM) }
-  var tiles by remember(vehicle?.id, vehicle?.latitude, vehicle?.longitude, zoom) { mutableStateOf<List<RasterTile>>(emptyList()) }
+  var selectedVehicleId by remember { mutableStateOf<String?>(null) }
+  var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+  var tiles by remember(locationSignature, zoom) { mutableStateOf<List<RasterTile>>(emptyList()) }
   var mapError by remember { mutableStateOf<String?>(null) }
-  LaunchedEffect(vehicle?.id, vehicle?.latitude, vehicle?.longitude, zoom) {
+  val markerTargets = remember(locationSignature, zoom, canvasSize) { mapCenter?.let { markerTargets(locatedVehicles, it, zoom, canvasSize) }.orEmpty() }
+  val selectedVehicle = locatedVehicles.firstOrNull { it.id == selectedVehicleId } ?: locatedVehicles.firstOrNull()
+  LaunchedEffect(locationSignature, zoom) {
     tiles = emptyList(); mapError = null
-    if (vehicle == null) { mapError = "No live vehicle position is available."; return@LaunchedEffect }
-    val center = webMercatorTile(vehicle.latitude!!, vehicle.longitude!!, zoom)
+    if (mapCenter == null) { mapError = "No live vehicle position is available."; return@LaunchedEffect }
+    val center = webMercatorTile(mapCenter.latitude, mapCenter.longitude, zoom)
     val originX = floor(center.x).toInt() - 1
     val originY = floor(center.y).toInt() - 1
     runCatching { (0..2).flatMap { row -> (0..2).map { column -> downloadTile(originX + column, originY + row, zoom) } } }
       .onSuccess { tiles = it }
       .onFailure { mapError = it.message ?: "Unable to load map tiles." }
   }
-  Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedButton(onClick = { if (zoom > 3) zoom-- }) { Text("−") }; Text("Zoom $zoom", modifier = Modifier.padding(top = 12.dp)); OutlinedButton(onClick = { if (zoom < 19) zoom++ }) { Text("+") } }
   Box(Modifier.fillMaxWidth().height(280.dp)) {
-    Canvas(Modifier.fillMaxWidth().height(280.dp)) {
+    Canvas(Modifier.fillMaxWidth().height(280.dp).onSizeChanged { canvasSize = it }.pointerInput(markerTargets) { detectTapGestures { tap -> markerTargets.minByOrNull { (it.offset - tap).getDistance() }?.takeIf { (it.offset - tap).getDistance() <= 28f }?.let { selectedVehicleId = it.vehicle.id } } }.pointerInput(Unit) { var scaleAccumulator = 1f; detectTransformGestures { _, _, scale, _ -> scaleAccumulator *= scale; if (scaleAccumulator > 1.15f && zoom < 19) { zoom++; scaleAccumulator = 1f } else if (scaleAccumulator < 0.87f && zoom > 3) { zoom--; scaleAccumulator = 1f } } }) {
       drawRect(Color(0xFFE8EDF2))
-      if (vehicle == null || tiles.isEmpty()) return@Canvas
-      val center = webMercatorTile(vehicle.latitude!!, vehicle.longitude!!, zoom)
+      if (mapCenter == null || tiles.isEmpty()) return@Canvas
+      val center = webMercatorTile(mapCenter.latitude, mapCenter.longitude, zoom)
       val originX = floor(center.x).toInt() - 1
       val originY = floor(center.y).toInt() - 1
       val tileSize = minOf(size.width / 3f, size.height / 3f)
@@ -115,16 +124,19 @@ class AuthViewModel : ViewModel() {
       for (row in 0..2) for (column in 0..2) {
         tileByCoordinate["${wrapTileX(originX + column, zoom)}:${originY + row}"]?.let { tile -> drawImage(tile.bitmap.asImageBitmap(), dstOffset = IntOffset((left + column * tileSize).toInt(), (top + row * tileSize).toInt()), dstSize = IntSize(tileSize.toInt(), tileSize.toInt())) }
       }
-      drawCircle(Color(0xFFD32F2F), radius = 10f, center = Offset((left + (center.x - originX) * tileSize).toFloat(), (top + (center.y - originY) * tileSize).toFloat()))
+      markerTargets(locatedVehicles, mapCenter, zoom, IntSize(size.width.toInt(), size.height.toInt())).forEach { marker -> drawCircle(if (marker.vehicle.id == selectedVehicle?.id) Color(0xFFD32F2F) else Color(0xFF1565C0), radius = if (marker.vehicle.id == selectedVehicle?.id) 11f else 8f, center = marker.offset) }
     }
-    vehicle?.let { Surface(Modifier.align(Alignment.TopStart).padding(8.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f), shadowElevation = 2.dp) { Text("${it.registrationNo} · ${it.speed ?: 0.0} km/h\n${it.fixTime ?: "Unknown time"}", modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.labelSmall) } }
+    selectedVehicle?.let { Surface(Modifier.align(Alignment.TopStart).padding(8.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f), shadowElevation = 2.dp) { Text("${it.registrationNo} · ${it.speed ?: 0.0} km/h\n${it.fixTime ?: "Unknown time"}\nPinch with two fingers to zoom · Tap a marker", modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.labelSmall) } }
   }
   Text(mapError ?: if (tiles.isEmpty()) "Loading live map…" else "Live map · © MapTiler / OpenStreetMap", color = if (mapError == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
 }
 
 private const val DEFAULT_MAP_ZOOM = 15
 private data class TileCoordinate(val x: Double, val y: Double)
+private data class MapLocation(val latitude: Double, val longitude: Double)
 private data class RasterTile(val x: Int, val y: Int, val bitmap: Bitmap)
+private data class MarkerTarget(val vehicle: LiveVehicle, val offset: Offset)
+private fun markerTargets(vehicles: List<LiveVehicle>, center: MapLocation, zoom: Int, size: IntSize): List<MarkerTarget> { if (size == IntSize.Zero) return emptyList(); val centerTile = webMercatorTile(center.latitude, center.longitude, zoom); val originX = floor(centerTile.x).toInt() - 1; val originY = floor(centerTile.y).toInt() - 1; val tileSize = minOf(size.width / 3f, size.height / 3f); val left = (size.width - tileSize * 3) / 2f; val top = (size.height - tileSize * 3) / 2f; return vehicles.mapNotNull { vehicle -> val point = webMercatorTile(vehicle.latitude ?: return@mapNotNull null, vehicle.longitude ?: return@mapNotNull null, zoom); val offset = Offset((left + (point.x - originX) * tileSize).toFloat(), (top + (point.y - originY) * tileSize).toFloat()); if (offset.x in 0f..size.width.toFloat() && offset.y in 0f..size.height.toFloat()) MarkerTarget(vehicle, offset) else null } }
 private fun webMercatorTile(latitude: Double, longitude: Double, zoom: Int): TileCoordinate { val tiles = 1 shl zoom; val latitudeRadians = latitude * PI / 180.0; return TileCoordinate((longitude + 180.0) / 360.0 * tiles, (1.0 - ln(tan(latitudeRadians) + 1.0 / cos(latitudeRadians)) / PI) / 2.0 * tiles) }
 private fun wrapTileX(x: Int, zoom: Int): Int { val tiles = 1 shl zoom; return ((x % tiles) + tiles) % tiles }
 private suspend fun downloadTile(x: Int, y: Int, zoom: Int): RasterTile = withContext(Dispatchers.IO) { val tileX = wrapTileX(x, zoom); val connection = (URL("https://tile.openstreetmap.org/$zoom/$tileX/$y.png").openConnection() as HttpURLConnection).apply { connectTimeout = 15_000; readTimeout = 15_000; setRequestProperty("User-Agent", "FleetPlatform-Android/1.0") }; if (connection.responseCode !in 200..299) throw IllegalStateException("Map tiles returned HTTP ${connection.responseCode}."); val bitmap = connection.inputStream.use { BitmapFactory.decodeStream(it) } ?: throw IllegalStateException("Map tile could not be decoded."); RasterTile(tileX, y, bitmap) }
