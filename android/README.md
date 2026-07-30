@@ -6,4 +6,10 @@ Set `FLEET_API_BASE_URL` in `gradle.properties` to the public HTTPS API proxy UR
 
 Debug builds may also use a temporary `http://` development URL. Release builds retain Android's HTTPS-only default and must use HTTPS.
 
+For the native map, add your MapTiler key to your uncommitted `gradle.properties`:
+
+`MAPTILER_API_KEY=your_key`
+
+The Docker `.env.docker` file is for server containers and is not available to Android builds.
+
 Before enabling Firebase Cloud Messaging, register Android app ID `com.biapps.fleet` in Firebase and place `google-services.json` in `app/` (it must not be committed).

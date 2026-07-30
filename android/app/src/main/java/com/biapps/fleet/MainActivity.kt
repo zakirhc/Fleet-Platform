@@ -98,7 +98,7 @@ class AuthViewModel : ViewModel() {
   Column {
     AndroidView(
       modifier = Modifier.fillMaxWidth().height(280.dp),
-      factory = { context -> MapLibre.getInstance(context.applicationContext); MapView(context, MapLibreMapOptions().textureMode(true)).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); onStart(); onResume(); getMapAsync { loadedMap -> map = loadedMap; loadedMap.setStyle(Style.Builder().fromJson(OSM_RASTER_STYLE)) { mapReady = true } }; mapView = this } },
+      factory = { context -> MapLibre.getInstance(context.applicationContext); MapView(context, MapLibreMapOptions().textureMode(true)).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); onStart(); onResume(); getMapAsync { loadedMap -> map = loadedMap; loadedMap.setStyle(mapStyle()) { mapReady = true } }; mapView = this } },
     )
     mapError?.let { Text("Map error: $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
   }
@@ -108,6 +108,10 @@ class AuthViewModel : ViewModel() {
 private const val OSM_RASTER_STYLE = """
 {"version":8,"sources":{"openstreetmap":{"type":"raster","tiles":["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],"tileSize":256,"attribution":"© OpenStreetMap contributors","maxzoom":19}},"layers":[{"id":"openstreetmap","type":"raster","source":"openstreetmap"}]}
 """
+
+private fun mapStyle(): String = BuildConfig.MAPTILER_API_KEY.trim().takeIf { it.isNotEmpty() }
+  ?.let { "https://api.maptiler.com/maps/streets-v4/style.json?key=$it" }
+  ?: OSM_RASTER_STYLE
 
 @Composable private fun AlertsScreen(session: Session) {
   var events by remember(session.accessToken) { mutableStateOf<List<GeofenceEvent>>(emptyList()) }
