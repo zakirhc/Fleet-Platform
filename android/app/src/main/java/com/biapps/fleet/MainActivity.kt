@@ -1,6 +1,8 @@
 package com.biapps.fleet
 
 import android.os.Bundle
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
@@ -20,6 +22,9 @@ import com.biapps.fleet.data.LiveVehicle
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import org.json.JSONArray
+import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { FleetApp() } }
@@ -62,9 +67,31 @@ class AuthViewModel : ViewModel() {
     loading -> CircularProgressIndicator()
     error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
     vehicles.isEmpty() -> Text("No vehicles with assigned tracking devices were found.")
-    else -> LazyColumn(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(vehicles, key = { it.id }) { vehicle -> Card { Column(Modifier.fillMaxWidth().padding(16.dp)) { Text(vehicle.registrationNo, style = MaterialTheme.typography.titleMedium); if (vehicle.latitude == null || vehicle.longitude == null) Text("No location received yet") else { Text("${"%.5f".format(vehicle.latitude)}, ${"%.5f".format(vehicle.longitude)}"); Text("${vehicle.speed ?: 0.0} km/h · ${vehicle.fixTime ?: "Unknown time"}", style = MaterialTheme.typography.labelLarge) } } } } }
+    else -> { LiveMap(vehicles); Spacer(Modifier.height(12.dp)); LazyColumn(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(vehicles, key = { it.id }) { vehicle -> Card { Column(Modifier.fillMaxWidth().padding(16.dp)) { Text(vehicle.registrationNo, style = MaterialTheme.typography.titleMedium); if (vehicle.latitude == null || vehicle.longitude == null) Text("No location received yet") else { Text("${"%.5f".format(vehicle.latitude)}, ${"%.5f".format(vehicle.longitude)}"); Text("${vehicle.speed ?: 0.0} km/h · ${vehicle.fixTime ?: "Unknown time"}", style = MaterialTheme.typography.labelLarge) } } } } }
+    }
   }
 }
+
+@Composable private fun LiveMap(vehicles: List<LiveVehicle>) {
+  var webView by remember { mutableStateOf<WebView?>(null) }
+  var mapReady by remember { mutableStateOf(false) }
+  val payload = remember(vehicles) { mapPayload(vehicles) }
+  LaunchedEffect(webView, mapReady, payload) { if (mapReady) webView?.evaluateJavascript("window.setVehicles($payload);", null) }
+  AndroidView(
+    modifier = Modifier.fillMaxWidth().height(280.dp),
+    factory = { context -> WebView(context).apply { settings.javaScriptEnabled = true; settings.domStorageEnabled = true; webViewClient = object : WebViewClient() { override fun onPageFinished(view: WebView?, url: String?) { mapReady = true } }; loadDataWithBaseURL("https://fleet-map.local/", LEAFLET_MAP_HTML, "text/html", "UTF-8", null); webView = this } },
+  )
+}
+
+private fun mapPayload(vehicles: List<LiveVehicle>): String = JSONArray().apply {
+  vehicles.filter { it.latitude != null && it.longitude != null }.forEach { vehicle ->
+    put(JSONObject().put("id", vehicle.id).put("name", vehicle.registrationNo).put("latitude", vehicle.latitude).put("longitude", vehicle.longitude).put("speed", vehicle.speed ?: 0.0).put("fixTime", vehicle.fixTime ?: "Unknown time"))
+  }
+}.toString()
+
+private const val LEAFLET_MAP_HTML = """
+<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>html,body,#map{height:100%;margin:0} .leaflet-popup-content{font:14px sans-serif}</style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>const map=L.map('map').setView([23.8103,90.4125],7);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);const markers={};window.setVehicles=function(items){const ids=new Set(items.map(x=>x.id));Object.keys(markers).forEach(id=>{if(!ids.has(id)){map.removeLayer(markers[id]);delete markers[id]}});const points=[];items.forEach(x=>{const popup='<b>'+x.name+'</b><br>'+x.speed.toFixed(1)+' km/h<br>'+x.fixTime;if(markers[x.id]){markers[x.id].setLatLng([x.latitude,x.longitude]).setPopupContent(popup)}else{markers[x.id]=L.marker([x.latitude,x.longitude]).addTo(map).bindPopup(popup)}points.push([x.latitude,x.longitude])});if(points.length===1)map.setView(points[0],15);else if(points.length>1)map.fitBounds(points,{padding:[24,24],maxZoom:15})};</script></body></html>
+"""
 
 @Composable private fun AlertsScreen(session: Session) {
   var events by remember(session.accessToken) { mutableStateOf<List<GeofenceEvent>>(emptyList()) }
