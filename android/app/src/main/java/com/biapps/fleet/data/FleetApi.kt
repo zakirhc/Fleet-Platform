@@ -10,6 +10,7 @@ import java.net.URL
 
 data class Session(val accessToken: String, val refreshToken: String, val username: String)
 data class Vehicle(val id: String, val registrationNo: String, val fleetNo: String?, val make: String?, val model: String?, val status: String)
+data class Driver(val id: String, val fullName: String, val employeeNo: String?, val mobile: String?, val designation: String?, val status: String)
 
 class FleetApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/')) {
   suspend fun login(username: String, password: String): Session = request("/auth/login", JSONObject().put("username", username).put("password", password)).let { data ->
@@ -28,6 +29,21 @@ class FleetApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/
           make = vehicle.optString("make").takeIf { it.isNotBlank() },
           model = vehicle.optString("model").takeIf { it.isNotBlank() },
           status = vehicle.optString("status", "UNKNOWN"),
+        )
+      }
+    }
+  }
+
+  suspend fun drivers(accessToken: String): List<Driver> = get("/drivers", accessToken).let { drivers ->
+    (0 until drivers.length()).map { index ->
+      drivers.getJSONObject(index).let { driver ->
+        Driver(
+          id = driver.getString("id"),
+          fullName = driver.getString("fullName"),
+          employeeNo = driver.optString("employeeNo").takeIf { it.isNotBlank() },
+          mobile = driver.optString("mobile").takeIf { it.isNotBlank() },
+          designation = driver.optString("designation").takeIf { it.isNotBlank() },
+          status = driver.optString("status", "UNKNOWN"),
         )
       }
     }
