@@ -81,6 +81,7 @@ class AuthViewModel : ViewModel() {
   var map by remember { mutableStateOf<MapLibreMap?>(null) }
   var mapReady by remember { mutableStateOf(false) }
   var mapError by remember { mutableStateOf<String?>(null) }
+  var mapStatus by remember { mutableStateOf("Starting native map…") }
   LaunchedEffect(map, mapReady, vehicles) {
     val activeMap = map ?: return@LaunchedEffect
     if (!mapReady) return@LaunchedEffect
@@ -98,9 +99,9 @@ class AuthViewModel : ViewModel() {
   Column {
     AndroidView(
       modifier = Modifier.fillMaxWidth().height(280.dp),
-      factory = { context -> MapLibre.getInstance(context.applicationContext); MapView(context, MapLibreMapOptions().textureMode(true)).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); onStart(); onResume(); getMapAsync { loadedMap -> map = loadedMap; loadedMap.setStyle(mapStyle()) { mapReady = true } }; mapView = this } },
+      factory = { context -> MapLibre.getInstance(context.applicationContext); MapView(context, MapLibreMapOptions().textureMode(true)).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); onStart(); onResume(); getMapAsync { loadedMap -> map = loadedMap; mapStatus = "Map engine ready — loading style…"; loadedMap.setStyle(mapStyle()) { mapReady = true; mapStatus = "Map style loaded" } }; mapView = this } },
     )
-    mapError?.let { Text("Map error: $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
+    Text(mapError?.let { "Map error: $it" } ?: mapStatus, color = if (mapError == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
   }
   DisposableEffect(mapView) { onDispose { mapView?.onPause(); mapView?.onStop(); mapView?.onDestroy() } }
 }
