@@ -84,7 +84,7 @@ class AuthViewModel : ViewModel() {
     loading -> CircularProgressIndicator()
     error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
     vehicles.isEmpty() -> Text("No vehicles with assigned tracking devices were found.")
-    else -> { LiveMap(vehicles); Spacer(Modifier.height(12.dp)); LazyColumn(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(vehicles, key = { it.id }) { vehicle -> Card { Column(Modifier.fillMaxWidth().padding(16.dp)) { Text(vehicle.registrationNo, style = MaterialTheme.typography.titleMedium); if (vehicle.latitude == null || vehicle.longitude == null) Text("No location received yet") else { Text("${"%.5f".format(vehicle.latitude)}, ${"%.5f".format(vehicle.longitude)}"); Text("${vehicle.speed ?: 0.0} km/h · ${vehicle.fixTime ?: "Unknown time"}", style = MaterialTheme.typography.labelLarge) } } } } }
+    else -> LiveMap(vehicles)
     }
   }
 }
