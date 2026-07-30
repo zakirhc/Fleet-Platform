@@ -11,7 +11,9 @@ data class Session(val accessToken: String, val refreshToken: String, val userna
 
 class FleetApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/')) {
   suspend fun login(username: String, password: String): Session = request("/auth/login", JSONObject().put("username", username).put("password", password)).let { data ->
-    Session(data.getString("accessToken"), data.getString("refreshToken"), username)
+    // Older deployed Fleet backends issued access tokens only. Accept that response
+    // during the upgrade; newer servers also provide a refresh token.
+    Session(data.getString("accessToken"), data.optString("refreshToken", ""), username)
   }
 
   private suspend fun request(path: String, body: JSONObject): JSONObject = withContext(Dispatchers.IO) {
