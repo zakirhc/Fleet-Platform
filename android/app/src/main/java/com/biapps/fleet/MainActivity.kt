@@ -1,9 +1,12 @@
 package com.biapps.fleet
 
 import android.os.Bundle
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -19,20 +22,21 @@ import com.biapps.fleet.data.GeofenceEvent
 import com.biapps.fleet.data.LiveVehicle
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import org.maplibre.android.MapLibre
-import org.maplibre.android.WellKnownTileServer
-import org.maplibre.android.annotations.MarkerOptions
-import org.maplibre.android.camera.CameraUpdateFactory
-import org.maplibre.android.geometry.LatLng
-import org.maplibre.android.maps.MapLibreMap
-import org.maplibre.android.maps.MapLibreMapOptions
-import org.maplibre.android.maps.MapView
-import org.maplibre.android.maps.Style
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlin.math.PI
+import kotlin.math.floor
+import kotlin.math.ln
+import kotlin.math.tan
+import kotlin.math.cos
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { FleetApp() } }
@@ -81,68 +85,44 @@ class AuthViewModel : ViewModel() {
 }
 
 @Composable private fun LiveMap(vehicles: List<LiveVehicle>) {
-  val lifecycleOwner = LocalLifecycleOwner.current
-  var mapView by remember { mutableStateOf<MapView?>(null) }
-  var map by remember { mutableStateOf<MapLibreMap?>(null) }
-  var mapReady by remember { mutableStateOf(false) }
+  val vehicle = vehicles.firstOrNull { it.latitude != null && it.longitude != null }
+  var tiles by remember(vehicle?.id, vehicle?.latitude, vehicle?.longitude) { mutableStateOf<List<RasterTile>>(emptyList()) }
   var mapError by remember { mutableStateOf<String?>(null) }
-  var mapStatus by remember { mutableStateOf("Starting native map…") }
-  var mapRequested by remember { mutableStateOf(false) }
-  LaunchedEffect(map, mapReady, vehicles) {
-    val activeMap = map ?: return@LaunchedEffect
-    if (!mapReady) return@LaunchedEffect
-    activeMap.clear()
-    val points = vehicles.mapNotNull { vehicle ->
-      val latitude = vehicle.latitude ?: return@mapNotNull null
-      val longitude = vehicle.longitude ?: return@mapNotNull null
-      LatLng(latitude, longitude).also { point ->
-        activeMap.addMarker(MarkerOptions().position(point).title(vehicle.registrationNo).snippet("${vehicle.speed ?: 0.0} km/h · ${vehicle.fixTime ?: "Unknown time"}"))
-      }
-    }
-    if (points.size == 1) activeMap.animateCamera(CameraUpdateFactory.newLatLngZoom(points.first(), 15.0))
-    else if (points.isNotEmpty()) activeMap.animateCamera(CameraUpdateFactory.newLatLngBounds(org.maplibre.android.geometry.LatLngBounds.fromLatLngs(points), 48))
+  LaunchedEffect(vehicle?.id, vehicle?.latitude, vehicle?.longitude) {
+    tiles = emptyList(); mapError = null
+    if (vehicle == null) { mapError = "No live vehicle position is available."; return@LaunchedEffect }
+    if (BuildConfig.MAPTILER_API_KEY.isBlank()) { mapError = "Set MAPTILER_API_KEY in android/gradle.properties."; return@LaunchedEffect }
+    val center = webMercatorTile(vehicle.latitude!!, vehicle.longitude!!, MAP_ZOOM)
+    val originX = floor(center.x).toInt() - 1
+    val originY = floor(center.y).toInt() - 1
+    runCatching { (0..2).flatMap { row -> (0..2).map { column -> downloadTile(originX + column, originY + row) } } }
+      .onSuccess { tiles = it }
+      .onFailure { mapError = it.message ?: "Unable to load map tiles." }
   }
-  Column {
-    AndroidView(
-      modifier = Modifier.fillMaxWidth().height(280.dp),
-      factory = { context -> MapLibre.getInstance(context.applicationContext, BuildConfig.MAPTILER_API_KEY, WellKnownTileServer.MapTiler); MapView(context, MapLibreMapOptions().textureMode(true)).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); mapStatus = "Map view created — waiting for Android lifecycle…"; mapView = this } },
-    )
-    Text(mapError?.let { "Map error: $it" } ?: mapStatus, color = if (mapError == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
-  }
-  DisposableEffect(lifecycleOwner, mapView) {
-    val view = mapView ?: return@DisposableEffect onDispose { }
-    val observer = LifecycleEventObserver { _, event ->
-      when (event) {
-        Lifecycle.Event.ON_START -> view.onStart()
-        Lifecycle.Event.ON_RESUME -> view.onResume()
-        Lifecycle.Event.ON_PAUSE -> view.onPause()
-        Lifecycle.Event.ON_STOP -> view.onStop()
-        else -> Unit
-      }
+  Canvas(Modifier.fillMaxWidth().height(280.dp)) {
+    drawRect(Color(0xFFE8EDF2))
+    if (vehicle == null || tiles.isEmpty()) return@Canvas
+    val center = webMercatorTile(vehicle.latitude!!, vehicle.longitude!!, MAP_ZOOM)
+    val originX = floor(center.x).toInt() - 1
+    val originY = floor(center.y).toInt() - 1
+    val tileSize = minOf(size.width / 3f, size.height / 3f)
+    val left = (size.width - tileSize * 3) / 2f
+    val top = (size.height - tileSize * 3) / 2f
+    val tileByCoordinate = tiles.associateBy { "${it.x}:${it.y}" }
+    for (row in 0..2) for (column in 0..2) {
+      tileByCoordinate["${wrapTileX(originX + column)}:${originY + row}"]?.let { tile -> drawImage(tile.bitmap.asImageBitmap(), dstOffset = IntOffset((left + column * tileSize).toInt(), (top + row * tileSize).toInt()), dstSize = IntSize(tileSize.toInt(), tileSize.toInt())) }
     }
-    lifecycleOwner.lifecycle.addObserver(observer)
-    if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) view.onStart()
-    if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) view.onResume()
-    if (!mapRequested) {
-      mapRequested = true
-      mapStatus = "Map lifecycle active — requesting map…"
-      view.getMapAsync { loadedMap ->
-        map = loadedMap
-        mapStatus = "Map engine ready — loading style…"
-        loadedMap.setStyle(mapStyle()) { mapReady = true; mapStatus = "Map style loaded" }
-      }
-    }
-    onDispose { lifecycleOwner.lifecycle.removeObserver(observer); view.onPause(); view.onStop(); view.onDestroy() }
+    drawCircle(Color(0xFFD32F2F), radius = 10f, center = Offset(left + (center.x - originX) * tileSize, top + (center.y - originY) * tileSize))
   }
+  Text(mapError ?: if (tiles.isEmpty()) "Loading live map…" else "Live map · © MapTiler / OpenStreetMap", color = if (mapError == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
 }
 
-private const val OSM_RASTER_STYLE = """
-{"version":8,"sources":{"openstreetmap":{"type":"raster","tiles":["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],"tileSize":256,"attribution":"© OpenStreetMap contributors","maxzoom":19}},"layers":[{"id":"openstreetmap","type":"raster","source":"openstreetmap"}]}
-"""
-
-private fun mapStyle(): String = BuildConfig.MAPTILER_API_KEY.trim().takeIf { it.isNotEmpty() }
-  ?.let { "https://api.maptiler.com/maps/streets-v4/style.json?key=$it" }
-  ?: OSM_RASTER_STYLE
+private const val MAP_ZOOM = 15
+private data class TileCoordinate(val x: Double, val y: Double)
+private data class RasterTile(val x: Int, val y: Int, val bitmap: Bitmap)
+private fun webMercatorTile(latitude: Double, longitude: Double, zoom: Int): TileCoordinate { val tiles = 1 shl zoom; val latitudeRadians = latitude * PI / 180.0; return TileCoordinate((longitude + 180.0) / 360.0 * tiles, (1.0 - ln(tan(latitudeRadians) + 1.0 / cos(latitudeRadians)) / PI) / 2.0 * tiles) }
+private fun wrapTileX(x: Int): Int { val tiles = 1 shl MAP_ZOOM; return ((x % tiles) + tiles) % tiles }
+private suspend fun downloadTile(x: Int, y: Int): RasterTile = withContext(Dispatchers.IO) { val tileX = wrapTileX(x); val connection = (URL("https://api.maptiler.com/maps/streets-v4/$MAP_ZOOM/$tileX/$y.png?key=${BuildConfig.MAPTILER_API_KEY}").openConnection() as HttpURLConnection).apply { connectTimeout = 15_000; readTimeout = 15_000 }; if (connection.responseCode !in 200..299) throw IllegalStateException("Map tiles returned HTTP ${connection.responseCode}."); val bitmap = connection.inputStream.use { BitmapFactory.decodeStream(it) } ?: throw IllegalStateException("Map tile could not be decoded."); RasterTile(tileX, y, bitmap) }
 
 @Composable private fun AlertsScreen(session: Session) {
   var events by remember(session.accessToken) { mutableStateOf<List<GeofenceEvent>>(emptyList()) }

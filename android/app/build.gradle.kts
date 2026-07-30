@@ -14,6 +14,5 @@ dependencies {
   implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
   implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.10.0")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-  implementation("org.maplibre.gl:android-sdk-opengl:13.1.0")
   debugImplementation("androidx.compose.ui:ui-tooling")
 }
