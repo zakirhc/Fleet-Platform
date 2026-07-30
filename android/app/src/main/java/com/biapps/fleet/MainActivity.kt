@@ -99,7 +99,7 @@ class AuthViewModel : ViewModel() {
   Column {
     AndroidView(
       modifier = Modifier.fillMaxWidth().height(280.dp),
-      factory = { context -> MapLibre.getInstance(context.applicationContext); MapView(context, MapLibreMapOptions().textureMode(true)).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); onStart(); onResume(); getMapAsync { loadedMap -> map = loadedMap; mapStatus = "Map engine ready — loading style…"; loadedMap.setStyle(mapStyle()) { mapReady = true; mapStatus = "Map style loaded" } }; mapView = this } },
+      factory = { context -> MapLibre.getInstance(context.applicationContext); MapView(context, MapLibreMapOptions().textureMode(true)).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); post { onStart(); onResume(); getMapAsync { loadedMap -> map = loadedMap; mapStatus = "Map engine ready — loading style…"; loadedMap.setStyle(mapStyle()) { mapReady = true; mapStatus = "Map style loaded" } } }; mapView = this } },
     )
     Text(mapError?.let { "Map error: $it" } ?: mapStatus, color = if (mapError == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
   }
