@@ -11,6 +11,7 @@ import java.net.URL
 data class Session(val accessToken: String, val refreshToken: String, val username: String)
 data class Vehicle(val id: String, val registrationNo: String, val fleetNo: String?, val make: String?, val model: String?, val status: String)
 data class Driver(val id: String, val fullName: String, val employeeNo: String?, val mobile: String?, val designation: String?, val status: String)
+data class GeofenceEvent(val id: String, val eventType: String, val eventTime: String, val registrationNo: String?, val geofenceName: String?)
 
 class FleetApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/')) {
   suspend fun login(username: String, password: String): Session = request("/auth/login", JSONObject().put("username", username).put("password", password)).let { data ->
@@ -44,6 +45,20 @@ class FleetApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/
           mobile = driver.optString("mobile").takeIf { it.isNotBlank() },
           designation = driver.optString("designation").takeIf { it.isNotBlank() },
           status = driver.optString("status", "UNKNOWN"),
+        )
+      }
+    }
+  }
+
+  suspend fun geofenceEvents(accessToken: String): List<GeofenceEvent> = get("/geofences/events/history?limit=50", accessToken).let { events ->
+    (0 until events.length()).map { index ->
+      events.getJSONObject(index).let { event ->
+        GeofenceEvent(
+          id = event.getString("id"),
+          eventType = event.optString("eventType", "EVENT"),
+          eventTime = event.optString("eventTime"),
+          registrationNo = event.optString("registrationNo").takeIf { it.isNotBlank() },
+          geofenceName = event.optString("geofenceName").takeIf { it.isNotBlank() },
         )
       }
     }
