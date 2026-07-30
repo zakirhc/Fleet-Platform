@@ -16,6 +16,7 @@
 - Operations data model and APIs for maintenance schedules, work orders, fuel, expenses, and documents.
 - Fleet reporting APIs for utilisation, trips, idling, driver behaviour, overspeed, and fuel/expense summaries.
 - Dashboard report tables, utilisation CSV download, and persisted WhatsApp report schedules.
+- Rotating, revocable refresh-token sessions for Android and other mobile clients.
 
 ### Fixed
 

@@ -55,9 +55,24 @@ model User {
 
   company Company        @relation(fields: [companyId], references: [id], onUpdate: Restrict, map: "fk_user_company")
   roles   fm_user_role[]
+  authSessions AuthSession[]
 
   @@index([companyId], map: "fk_user_company")
   @@map("fm_user")
+}
+
+model AuthSession {
+  id               String    @id @db.Char(36)
+  userId           BigInt    @map("user_id") @db.UnsignedBigInt
+  refreshTokenHash String    @map("refresh_token_hash") @db.VarChar(255)
+  expiresAt        DateTime  @map("expires_at") @db.DateTime(0)
+  revokedAt        DateTime? @map("revoked_at") @db.DateTime(0)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.DateTime(0)
+  lastUsedAt       DateTime? @map("last_used_at") @db.DateTime(0)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade, map: "fk_auth_session_user")
+
+  @@index([userId, revokedAt, expiresAt], map: "idx_auth_session_user_active")
+  @@map("fm_auth_session")
 }
 
 model Vehicle {

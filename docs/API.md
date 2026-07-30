@@ -5,7 +5,7 @@ Swagger is available at `/api/docs`. Successful API responses are wrapped as
 
 | Area | Implemented endpoints |
 | --- | --- |
-| Auth | `POST /auth/login`, `POST /auth/bootstrap-admin`, `GET /auth/me` |
+| Auth | `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/bootstrap-admin`, `GET /auth/me` |
 | Vehicles | `GET/POST /vehicles`, `GET/PATCH/DELETE /vehicles/:id`, `PATCH /vehicles/:id/device/:deviceId` |
 | Drivers | `GET/POST /drivers`, `GET/PATCH/DELETE /drivers/:id`, assignments under `/drivers/:id/vehicles/:vehicleId` |
 | Devices | `GET /devices`, `/devices/search?q=`, `/devices/:id` |
@@ -20,5 +20,10 @@ Swagger is available at `/api/docs`. Successful API responses are wrapped as
 Protected routes require `Authorization: Bearer <accessToken>`. Socket clients
 send the token in `auth.token` or the authorization header. WhatsApp webhook
 callback URL is `/whatsapp/webhook/:companyId`.
+
+`POST /auth/login` returns a short-lived access token and a rotating refresh
+token. Send `{ "refreshToken": "..." }` to `/auth/refresh` to obtain a new
+pair, or to `/auth/logout` to revoke that mobile/browser session. Refresh
+tokens cannot access protected API routes.
 
 User management requires `SUPER_ADMIN` or `COMPANY_ADMIN` role assignment.

@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 
 import * as argon2 from 'argon2';
+import { randomUUID } from 'crypto';
 
 import { UserRepository } from '../user/user.repository';
 
@@ -44,18 +45,48 @@ export class AuthService {
 
     await this.users.updateLastLogin(user.id);
 
-    const payload: JwtPayload = {
-      sub: Number(user.id),
-      companyId: Number(user.companyId),
-      username: user.username,
-    };
-
-    const accessToken = await this.jwtService.signAsync(payload);
-    return {
-      accessToken,
-      expiresIn: 900,
-    };
+    return this.issueTokens(user);
   }
+
+  async refresh(refreshToken: string) {
+    const payload = await this.verifyRefreshToken(refreshToken);
+    const session = await this.prisma.authSession.findUnique({ where: { id: payload.sessionId }, include: { user: true } });
+    if (!session || session.revokedAt || session.expiresAt <= new Date() || session.user.status !== 'ACTIVE') throw new UnauthorizedException('Refresh session is no longer valid.');
+    if (!(await argon2.verify(session.refreshTokenHash, refreshToken))) throw new UnauthorizedException('Refresh token is invalid.');
+    await this.prisma.authSession.update({ where: { id: session.id }, data: { revokedAt: new Date(), lastUsedAt: new Date() } });
+    return this.issueTokens(session.user);
+  }
+
+  async logout(refreshToken: string) {
+    const payload = await this.verifyRefreshToken(refreshToken);
+    await this.prisma.authSession.updateMany({ where: { id: payload.sessionId, userId: BigInt(payload.sub), revokedAt: null }, data: { revokedAt: new Date() } });
+    return { loggedOut: true };
+  }
+
+  private async issueTokens(user: { id: bigint; companyId: bigint; username: string }) {
+    const base = { sub: Number(user.id), companyId: Number(user.companyId), username: user.username };
+    const accessToken = await this.jwtService.signAsync({ ...base, tokenType: 'access' } satisfies JwtPayload);
+    const sessionId = randomUUID();
+    const refreshToken = await this.jwtService.signAsync({ ...base, tokenType: 'refresh', sessionId } satisfies JwtPayload, { secret: this.refreshSecret(), expiresIn: this.refreshExpiresIn() as never });
+    const expiresAt = new Date(Date.now() + this.durationMilliseconds(this.refreshExpiresIn()));
+    await this.prisma.authSession.create({ data: { id: sessionId, userId: user.id, refreshTokenHash: await argon2.hash(refreshToken), expiresAt } });
+    return { accessToken, expiresIn: 900, refreshToken, refreshExpiresIn: this.refreshExpiresIn() };
+  }
+
+  private async verifyRefreshToken(token: string) {
+    try {
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token, { secret: this.refreshSecret() });
+      if (payload.tokenType !== 'refresh' || !payload.sessionId) throw new UnauthorizedException('Invalid refresh token.');
+      return payload;
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
+      throw new UnauthorizedException('Refresh token is invalid or expired.');
+    }
+  }
+
+  private refreshSecret() { return this.config.get<string>('JWT_REFRESH_SECRET') ?? this.config.getOrThrow<string>('JWT_SECRET'); }
+  private refreshExpiresIn() { return this.config.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d'; }
+  private durationMilliseconds(value: string) { const match = /^(\d+)([smhd])$/.exec(value); if (!match) throw new Error('JWT_REFRESH_EXPIRES_IN must use a number followed by s, m, h, or d.'); const amount = Number(match[1]); return amount * ({ s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 } as const)[match[2] as 's' | 'm' | 'h' | 'd']; }
 
   async bootstrapAdmin(username: string, bootstrapSecret: string) {
     const configured = this.config.get<string>('BOOTSTRAP_ADMIN_SECRET');

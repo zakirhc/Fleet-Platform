@@ -7,6 +7,8 @@ export const validationSchema = Joi.object({
 
   JWT_SECRET: Joi.string().min(16).required(),
   JWT_EXPIRES_IN: Joi.string().default('15m'),
+  JWT_REFRESH_SECRET: Joi.string().min(16).optional(),
+  JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
   BOOTSTRAP_ADMIN_SECRET: Joi.string().optional(),
   WHATSAPP_TOKEN_ENCRYPTION_KEY: Joi.string().optional(),
   WHATSAPP_GRAPH_API_VERSION: Joi.string().optional(),
