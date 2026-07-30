@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import org.maplibre.android.MapLibre
+import org.maplibre.android.WellKnownTileServer
 import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -99,7 +100,7 @@ class AuthViewModel : ViewModel() {
   Column {
     AndroidView(
       modifier = Modifier.fillMaxWidth().height(280.dp),
-      factory = { context -> MapLibre.getInstance(context.applicationContext, BuildConfig.MAPTILER_API_KEY); MapView(context, MapLibreMapOptions().textureMode(true)).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); post { onStart(); onResume(); getMapAsync { loadedMap -> map = loadedMap; mapStatus = "Map engine ready — loading style…"; loadedMap.setStyle(mapStyle()) { mapReady = true; mapStatus = "Map style loaded" } } }; mapView = this } },
+      factory = { context -> MapLibre.getInstance(context.applicationContext, BuildConfig.MAPTILER_API_KEY, WellKnownTileServer.MapTiler); MapView(context, MapLibreMapOptions().textureMode(true)).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); post { onStart(); onResume(); getMapAsync { loadedMap -> map = loadedMap; mapStatus = "Map engine ready — loading style…"; loadedMap.setStyle(mapStyle()) { mapReady = true; mapStatus = "Map style loaded" } } }; mapView = this } },
     )
     Text(mapError?.let { "Map error: $it" } ?: mapStatus, color = if (mapError == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
   }
