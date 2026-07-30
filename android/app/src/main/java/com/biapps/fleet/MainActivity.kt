@@ -94,7 +94,7 @@ class AuthViewModel : ViewModel() {
   }
   AndroidView(
     modifier = Modifier.fillMaxWidth().height(280.dp),
-    factory = { context -> MapView(context).apply { MapLibre.getInstance(context.applicationContext); onCreate(null); onStart(); getMapAsync { loadedMap -> map = loadedMap; loadedMap.setStyle("https://demotiles.maplibre.org/style.json") { mapReady = true } }; mapView = this } },
+    factory = { context -> MapLibre.getInstance(context.applicationContext); MapView(context).apply { onCreate(null); onStart(); getMapAsync { loadedMap -> map = loadedMap; loadedMap.setStyle("https://demotiles.maplibre.org/style.json") { mapReady = true } }; mapView = this } },
   )
   DisposableEffect(mapView) { onDispose { mapView?.onStop(); mapView?.onDestroy() } }
 }
