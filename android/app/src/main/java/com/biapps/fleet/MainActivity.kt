@@ -1,7 +1,10 @@
 package com.biapps.fleet
 
 import android.os.Bundle
+import android.view.View
+import android.webkit.ConsoleMessage
 import android.webkit.WebView
+import android.webkit.WebChromeClient
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -75,12 +78,16 @@ class AuthViewModel : ViewModel() {
 @Composable private fun LiveMap(vehicles: List<LiveVehicle>) {
   var webView by remember { mutableStateOf<WebView?>(null) }
   var mapReady by remember { mutableStateOf(false) }
+  var mapError by remember { mutableStateOf<String?>(null) }
   val payload = remember(vehicles) { mapPayload(vehicles) }
   LaunchedEffect(webView, mapReady, payload) { if (mapReady) webView?.evaluateJavascript("window.setVehicles($payload);", null) }
-  AndroidView(
-    modifier = Modifier.fillMaxWidth().height(280.dp),
-    factory = { context -> WebView(context).apply { settings.javaScriptEnabled = true; settings.domStorageEnabled = true; webViewClient = object : WebViewClient() { override fun onPageFinished(view: WebView?, url: String?) { mapReady = true } }; loadDataWithBaseURL("https://fleet-map.local/", LEAFLET_MAP_HTML, "text/html", "UTF-8", null); webView = this } },
-  )
+  Column {
+    AndroidView(
+      modifier = Modifier.fillMaxWidth().height(280.dp),
+      factory = { context -> WebView(context).apply { setLayerType(View.LAYER_TYPE_SOFTWARE, null); settings.javaScriptEnabled = true; settings.domStorageEnabled = true; webChromeClient = object : WebChromeClient() { override fun onConsoleMessage(message: ConsoleMessage): Boolean { if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR) mapError = "Map could not load: ${message.message()}"; return true } }; webViewClient = object : WebViewClient() { override fun onPageFinished(view: WebView?, url: String?) { mapReady = true } }; loadDataWithBaseURL("https://fleet-map.local/", LEAFLET_MAP_HTML, "text/html", "UTF-8", null); webView = this } },
+    )
+    mapError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
+  }
 }
 
 private fun mapPayload(vehicles: List<LiveVehicle>): String = JSONArray().apply {
@@ -90,7 +97,7 @@ private fun mapPayload(vehicles: List<LiveVehicle>): String = JSONArray().apply 
 }.toString()
 
 private const val LEAFLET_MAP_HTML = """
-<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>html,body,#map{height:100%;margin:0} .leaflet-popup-content{font:14px sans-serif}</style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>const map=L.map('map').setView([23.8103,90.4125],7);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);const markers={};window.setVehicles=function(items){const ids=new Set(items.map(x=>x.id));Object.keys(markers).forEach(id=>{if(!ids.has(id)){map.removeLayer(markers[id]);delete markers[id]}});const points=[];items.forEach(x=>{const popup='<b>'+x.name+'</b><br>'+x.speed.toFixed(1)+' km/h<br>'+x.fixTime;if(markers[x.id]){markers[x.id].setLatLng([x.latitude,x.longitude]).setPopupContent(popup)}else{markers[x.id]=L.marker([x.latitude,x.longitude]).addTo(map).bindPopup(popup)}points.push([x.latitude,x.longitude])});if(points.length===1)map.setView(points[0],15);else if(points.length>1)map.fitBounds(points,{padding:[24,24],maxZoom:15})};</script></body></html>
+<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"><style>html,body,#map{height:100%;margin:0;background:#e8edf2}.leaflet-popup-content{font:14px sans-serif}.loading{padding:16px;font:14px sans-serif;color:#374151}</style></head><body><div id="map"><div class="loading">Loading live map…</div></div><script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script><script>const map=L.map('map').setView([23.8103,90.4125],7);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);const markers={};window.setVehicles=function(items){const ids=new Set(items.map(x=>x.id));Object.keys(markers).forEach(id=>{if(!ids.has(id)){map.removeLayer(markers[id]);delete markers[id]}});const points=[];items.forEach(x=>{const popup='<b>'+x.name+'</b><br>'+x.speed.toFixed(1)+' km/h<br>'+x.fixTime;if(markers[x.id]){markers[x.id].setLatLng([x.latitude,x.longitude]).setPopupContent(popup)}else{markers[x.id]=L.marker([x.latitude,x.longitude]).addTo(map).bindPopup(popup)}points.push([x.latitude,x.longitude])});if(points.length===1)map.setView(points[0],15);else if(points.length>1)map.fitBounds(points,{padding:[24,24],maxZoom:15})};</script></body></html>
 """
 
 @Composable private fun AlertsScreen(session: Session) {
