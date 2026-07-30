@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
@@ -11,6 +13,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
 import com.biapps.fleet.data.FleetApi
 import com.biapps.fleet.data.Session
+import com.biapps.fleet.data.Vehicle
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -38,7 +41,24 @@ class AuthViewModel : ViewModel() {
 @Composable private fun DispatcherHome(session: Session, logout: () -> Unit) {
   MaterialTheme { var page by remember { mutableStateOf("Fleet") }
     Scaffold(bottomBar = { NavigationBar { listOf("Fleet", "Map", "Alerts").forEach { item -> NavigationBarItem(selected = page == item, onClick = { page = item }, icon = {}, label = { Text(item) }) } } }) { padding ->
-      Column(Modifier.padding(padding).padding(24.dp)) { Text("Fleet Platform", style = MaterialTheme.typography.headlineMedium); Spacer(Modifier.height(12.dp)); Text("Signed in as ${session.username}"); Text(if (page == "Fleet") "Fleet status is the next screen." else "$page will use the Fleet v1 API."); TextButton(onClick = logout) { Text("Sign out") } }
+      Column(Modifier.padding(padding).padding(24.dp)) { Text("Fleet Platform", style = MaterialTheme.typography.headlineMedium); Spacer(Modifier.height(8.dp)); Text("Signed in as ${session.username}"); Spacer(Modifier.height(12.dp)); if (page == "Fleet") FleetScreen(session) else Text("$page will use the Fleet v1 API."); Spacer(Modifier.height(16.dp)); TextButton(onClick = logout) { Text("Sign out") } }
     }
+  }
+}
+
+@Composable private fun FleetScreen(session: Session) {
+  var vehicles by remember(session.accessToken) { mutableStateOf<List<Vehicle>>(emptyList()) }
+  var loading by remember(session.accessToken) { mutableStateOf(true) }
+  var error by remember(session.accessToken) { mutableStateOf<String?>(null) }
+  var reload by remember(session.accessToken) { mutableIntStateOf(0) }
+  suspend fun load() { loading = true; error = null; runCatching { FleetApi().vehicles(session.accessToken) }.onSuccess { vehicles = it }.onFailure { error = it.message ?: "Unable to load vehicles." }; loading = false }
+  LaunchedEffect(session.accessToken, reload) { load() }
+  Text("Vehicles", style = MaterialTheme.typography.titleLarge)
+  Spacer(Modifier.height(8.dp))
+  when {
+    loading -> CircularProgressIndicator()
+    error != null -> { Text(error!!, color = MaterialTheme.colorScheme.error); TextButton(onClick = { reload++ }) { Text("Retry") } }
+    vehicles.isEmpty() -> Text("No vehicles are assigned to this company.")
+    else -> LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(vehicles, key = { it.id }) { vehicle -> Card { Column(Modifier.fillMaxWidth().padding(16.dp)) { Text(vehicle.registrationNo, style = MaterialTheme.typography.titleMedium); Text(listOfNotNull(vehicle.fleetNo, listOfNotNull(vehicle.make, vehicle.model).joinToString(" ").takeIf { it.isNotBlank() }).joinToString(" · ")); Text(vehicle.status, style = MaterialTheme.typography.labelLarge) } } } }
   }
 }
