@@ -79,6 +79,7 @@ class AuthViewModel : ViewModel() {
   var mapView by remember { mutableStateOf<MapView?>(null) }
   var map by remember { mutableStateOf<MapLibreMap?>(null) }
   var mapReady by remember { mutableStateOf(false) }
+  var mapError by remember { mutableStateOf<String?>(null) }
   LaunchedEffect(map, mapReady, vehicles) {
     val activeMap = map ?: return@LaunchedEffect
     if (!mapReady) return@LaunchedEffect
@@ -93,10 +94,13 @@ class AuthViewModel : ViewModel() {
     if (points.size == 1) activeMap.animateCamera(CameraUpdateFactory.newLatLngZoom(points.first(), 15.0))
     else if (points.isNotEmpty()) activeMap.animateCamera(CameraUpdateFactory.newLatLngBounds(org.maplibre.android.geometry.LatLngBounds.fromLatLngs(points), 48))
   }
-  AndroidView(
-    modifier = Modifier.fillMaxWidth().height(280.dp),
-    factory = { context -> MapLibre.getInstance(context.applicationContext); MapView(context).apply { onCreate(null); onStart(); getMapAsync { loadedMap -> map = loadedMap; loadedMap.setStyle(Style.Builder().fromJson(OSM_RASTER_STYLE)) { mapReady = true } }; mapView = this } },
-  )
+  Column {
+    AndroidView(
+      modifier = Modifier.fillMaxWidth().height(280.dp),
+      factory = { context -> MapLibre.getInstance(context.applicationContext); MapView(context).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); onStart(); getMapAsync { loadedMap -> map = loadedMap; loadedMap.setStyle(Style.Builder().fromJson(OSM_RASTER_STYLE)) { mapReady = true } }; mapView = this } },
+    )
+    mapError?.let { Text("Map error: $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
+  }
   DisposableEffect(mapView) { onDispose { mapView?.onStop(); mapView?.onDestroy() } }
 }
 
