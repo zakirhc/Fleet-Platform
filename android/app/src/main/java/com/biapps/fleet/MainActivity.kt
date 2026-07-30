@@ -67,7 +67,6 @@ class AuthViewModel : ViewModel() {
   MaterialTheme { var page by remember { mutableStateOf("Fleet") }
     Scaffold(bottomBar = { NavigationBar { listOf("Fleet", "Drivers", "Map", "Alerts").forEach { item -> NavigationBarItem(selected = page == item, onClick = { page = item }, icon = {}, label = { Text(item) }) } } }) { padding ->
       Column(Modifier.padding(padding).padding(24.dp)) { Text("Fleet Platform", style = MaterialTheme.typography.headlineMedium); Spacer(Modifier.height(8.dp)); Text("Signed in as ${session.username}"); Spacer(Modifier.height(12.dp)); when (page) { "Fleet" -> FleetScreen(session); "Drivers" -> DriversScreen(session); "Map" -> LiveLocationsScreen(session); "Alerts" -> AlertsScreen(session) }; Spacer(Modifier.height(16.dp)); TextButton(onClick = logout) { Text("Sign out") } }
-    }
   }
 }
 
