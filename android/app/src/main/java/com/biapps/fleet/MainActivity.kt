@@ -26,6 +26,7 @@ import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 
@@ -97,7 +98,7 @@ class AuthViewModel : ViewModel() {
   Column {
     AndroidView(
       modifier = Modifier.fillMaxWidth().height(280.dp),
-      factory = { context -> MapLibre.getInstance(context.applicationContext); MapView(context).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); onStart(); onResume(); getMapAsync { loadedMap -> map = loadedMap; loadedMap.setStyle(Style.Builder().fromJson(OSM_RASTER_STYLE)) { mapReady = true } }; mapView = this } },
+      factory = { context -> MapLibre.getInstance(context.applicationContext); MapView(context, MapLibreMapOptions().textureMode(true)).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); onStart(); onResume(); getMapAsync { loadedMap -> map = loadedMap; loadedMap.setStyle(Style.Builder().fromJson(OSM_RASTER_STYLE)) { mapReady = true } }; mapView = this } },
     )
     mapError?.let { Text("Map error: $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
   }
