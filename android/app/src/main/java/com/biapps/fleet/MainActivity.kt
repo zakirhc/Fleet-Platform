@@ -112,7 +112,7 @@ class AuthViewModel : ViewModel() {
     for (row in 0..2) for (column in 0..2) {
       tileByCoordinate["${wrapTileX(originX + column)}:${originY + row}"]?.let { tile -> drawImage(tile.bitmap.asImageBitmap(), dstOffset = IntOffset((left + column * tileSize).toInt(), (top + row * tileSize).toInt()), dstSize = IntSize(tileSize.toInt(), tileSize.toInt())) }
     }
-    drawCircle(Color(0xFFD32F2F), radius = 10f, center = Offset(left + (center.x - originX) * tileSize, top + (center.y - originY) * tileSize))
+    drawCircle(Color(0xFFD32F2F), radius = 10f, center = Offset((left + (center.x - originX) * tileSize).toFloat(), (top + (center.y - originY) * tileSize).toFloat()))
   }
   Text(mapError ?: if (tiles.isEmpty()) "Loading live map…" else "Live map · © MapTiler / OpenStreetMap", color = if (mapError == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
 }
