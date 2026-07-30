@@ -84,7 +84,7 @@ class AuthViewModel : ViewModel() {
   Column {
     AndroidView(
       modifier = Modifier.fillMaxWidth().height(280.dp),
-      factory = { context -> WebView(context).apply { setLayerType(View.LAYER_TYPE_SOFTWARE, null); settings.javaScriptEnabled = true; settings.domStorageEnabled = true; webChromeClient = object : WebChromeClient() { override fun onConsoleMessage(message: ConsoleMessage): Boolean { if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR) mapError = "Map could not load: ${message.message()}"; return true } }; webViewClient = object : WebViewClient() { override fun onPageFinished(view: WebView?, url: String?) { mapReady = true } }; loadDataWithBaseURL("file:///android_asset/", LEAFLET_MAP_HTML, "text/html", "UTF-8", null); webView = this } },
+      factory = { context -> WebView(context).apply { setLayerType(View.LAYER_TYPE_SOFTWARE, null); settings.javaScriptEnabled = true; settings.domStorageEnabled = true; webChromeClient = object : WebChromeClient() { override fun onConsoleMessage(message: ConsoleMessage): Boolean { if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR) mapError = "Map could not load: ${message.message()}"; return true } }; webViewClient = object : WebViewClient() { override fun onPageFinished(view: WebView?, url: String?) { mapReady = true } }; loadUrl("file:///android_asset/map.html"); webView = this } },
     )
     mapError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
   }
