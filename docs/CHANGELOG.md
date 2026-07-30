@@ -17,6 +17,7 @@
 - Fleet reporting APIs for utilisation, trips, idling, driver behaviour, overspeed, and fuel/expense summaries.
 - Dashboard report tables, utilisation CSV download, and persisted WhatsApp report schedules.
 - Rotating, revocable refresh-token sessions for Android and other mobile clients.
+- Android FCM device registration, test delivery, and invalid-token deactivation.
 
 ### Fixed
 

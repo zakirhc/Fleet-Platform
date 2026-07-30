@@ -31,5 +31,5 @@
 ## Android v1.1 preparation
 
 - [x] Stable v1.0.1 web release tag and refresh-token API.
-- [ ] Registered mobile devices and Firebase Cloud Messaging delivery.
+- [x] Registered mobile devices and Firebase Cloud Messaging delivery foundation.
 - [ ] Android dispatcher application: live map, fleet status, route playback, and alerts.

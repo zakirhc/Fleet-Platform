@@ -13,6 +13,7 @@ Swagger is available at `/api/docs`. Successful API responses are wrapped as
 | Geofences | company geofences, Traccar creation/linking, alert rules, and event history under `/geofences` |
 | Operations | maintenance schedules, work orders, fuel, and expenses under `/operations` |
 | Documents | `GET/POST/DELETE /documents` (URL-based document register) |
+| Mobile | `POST /mobile-devices`, `DELETE /mobile-devices/:id`, and administrator-only `POST /mobile-devices/test` |
 | Reports | utilisation, trips, idling, driver behaviour, fuel/expense, utilisation CSV, and schedules under `/reports` |
 | WhatsApp | account, message, and webhook endpoints under `/whatsapp` |
 | Administration | company profile under `/company/me`; company-scoped users and role assignment under `/users` and `/roles` |
@@ -25,5 +26,10 @@ callback URL is `/whatsapp/webhook/:companyId`.
 token. Send `{ "refreshToken": "..." }` to `/auth/refresh` to obtain a new
 pair, or to `/auth/logout` to revoke that mobile/browser session. Refresh
 tokens cannot access protected API routes.
+
+Android registers its Firebase registration token with `POST /mobile-devices`
+using `{ "fcmToken": "...", "deviceName": "..." }`. Set
+`FIREBASE_SERVICE_ACCOUNT_JSON` to enable FCM delivery; without it, the mobile
+API remains available but no push message is sent.
 
 User management requires `SUPER_ADMIN` or `COMPANY_ADMIN` role assignment.

@@ -35,6 +35,7 @@ model Company {
   expenseRecords ExpenseRecord[]
   reportSchedules ReportSchedule[]
   documents FleetDocument[]
+  mobileDevices MobileDevice[]
 
   @@map("fm_company")
 }
@@ -56,6 +57,7 @@ model User {
   company Company        @relation(fields: [companyId], references: [id], onUpdate: Restrict, map: "fk_user_company")
   roles   fm_user_role[]
   authSessions AuthSession[]
+  mobileDevices MobileDevice[]
 
   @@index([companyId], map: "fk_user_company")
   @@map("fm_user")
@@ -73,6 +75,25 @@ model AuthSession {
 
   @@index([userId, revokedAt, expiresAt], map: "idx_auth_session_user_active")
   @@map("fm_auth_session")
+}
+
+model MobileDevice {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  companyId  BigInt   @map("company_id") @db.UnsignedBigInt
+  userId     BigInt   @map("user_id") @db.UnsignedBigInt
+  platform   String   @default("ANDROID") @db.VarChar(20)
+  fcmToken   String   @unique(map: "uk_mobile_device_fcm_token") @map("fcm_token") @db.VarChar(512)
+  deviceName String?  @map("device_name") @db.VarChar(150)
+  active     Boolean  @default(true)
+  lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.DateTime(0)
+  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.DateTime(0)
+  company    Company  @relation(fields: [companyId], references: [id], onUpdate: Restrict, map: "fk_mobile_device_company")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "fk_mobile_device_user")
+
+  @@index([companyId, active], map: "idx_mobile_device_company_active")
+  @@index([userId, active], map: "idx_mobile_device_user_active")
+  @@map("fm_mobile_device")
 }
 
 model Vehicle {

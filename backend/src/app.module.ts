@@ -18,6 +18,7 @@ import { GeofenceModule } from './geofence/geofence.module';
 import { OperationsModule } from './operations/operations.module';
 import { ReportModule } from './report/report.module';
 import { DocumentModule } from './document/document.module';
+import { MobileModule } from './mobile/mobile.module';
 import appConfig from './config/app.config';
 
 @Module({
@@ -54,6 +55,7 @@ import appConfig from './config/app.config';
     OperationsModule,
     ReportModule,
     DocumentModule,
+    MobileModule,
   ],
 })
 export class AppModule {}
