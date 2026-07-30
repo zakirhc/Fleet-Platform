@@ -42,6 +42,8 @@ import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.tan
 import kotlin.math.cos
+import kotlin.math.atan
+import kotlin.math.sinh
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { FleetApp() } }
@@ -66,55 +68,51 @@ class AuthViewModel : ViewModel() {
 @Composable private fun DispatcherHome(session: Session, logout: () -> Unit) {
   MaterialTheme { var page by remember { mutableStateOf("Fleet") }
     Scaffold(bottomBar = { NavigationBar { listOf("Fleet", "Drivers", "Map", "Alerts").forEach { item -> NavigationBarItem(selected = page == item, onClick = { page = item }, icon = {}, label = { Text(item) }) } } }) { padding ->
-      Column(Modifier.padding(padding).padding(24.dp)) { Text("Fleet Platform", style = MaterialTheme.typography.headlineMedium); Spacer(Modifier.height(8.dp)); Text("Signed in as ${session.username}"); Spacer(Modifier.height(12.dp)); when (page) { "Fleet" -> FleetScreen(session); "Drivers" -> DriversScreen(session); "Map" -> LiveLocationsScreen(session); "Alerts" -> AlertsScreen(session) }; Spacer(Modifier.height(16.dp)); TextButton(onClick = logout) { Text("Sign out") } }
+      Column(Modifier.fillMaxSize().padding(padding).padding(24.dp)) { Text("Fleet Platform", style = MaterialTheme.typography.headlineMedium); Spacer(Modifier.height(8.dp)); Text("Signed in as ${session.username}"); TextButton(onClick = logout) { Text("Sign out") }; Spacer(Modifier.height(12.dp)); when (page) { "Fleet" -> FleetScreen(session); "Drivers" -> DriversScreen(session); "Map" -> LiveLocationsScreen(session, Modifier.weight(1f)); "Alerts" -> AlertsScreen(session) } }
   }
 }
 }
 
-@Composable private fun LiveLocationsScreen(session: Session) {
+@Composable private fun LiveLocationsScreen(session: Session, modifier: Modifier = Modifier) {
   var vehicles by remember(session.accessToken) { mutableStateOf<List<LiveVehicle>>(emptyList()) }
   var loading by remember(session.accessToken) { mutableStateOf(true) }
   var error by remember(session.accessToken) { mutableStateOf<String?>(null) }
   var reload by remember(session.accessToken) { mutableIntStateOf(0) }
   suspend fun load() { loading = true; error = null; runCatching { FleetApi().latestPositions(session.accessToken) }.onSuccess { vehicles = it }.onFailure { error = it.message ?: "Unable to load live locations." }; loading = false }
   LaunchedEffect(session.accessToken, reload) { load() }
-  Text("Live locations", style = MaterialTheme.typography.titleLarge)
-  TextButton(onClick = { reload++ }, enabled = !loading) { Text("Refresh") }
-  when {
-    loading -> CircularProgressIndicator()
-    error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
-    vehicles.isEmpty() -> Text("No vehicles with assigned tracking devices were found.")
-    else -> LiveMap(vehicles)
-    }
+  Column(modifier) { Text("Live locations", style = MaterialTheme.typography.titleLarge); TextButton(onClick = { reload++ }, enabled = !loading) { Text("Refresh") }; when { loading -> CircularProgressIndicator(); error != null -> Text(error!!, color = MaterialTheme.colorScheme.error); vehicles.isEmpty() -> Text("No vehicles with assigned tracking devices were found."); else -> LiveMap(vehicles, Modifier.weight(1f)) } }
   }
-}
 
-@Composable private fun LiveMap(vehicles: List<LiveVehicle>) {
+
+@Composable private fun LiveMap(vehicles: List<LiveVehicle>, modifier: Modifier = Modifier) {
   val locatedVehicles = vehicles.filter { it.latitude != null && it.longitude != null }
   val locationSignature = locatedVehicles.joinToString { "${it.id}:${it.latitude}:${it.longitude}" }
-  val mapCenter = locatedVehicles.takeIf { it.isNotEmpty() }?.let { items -> MapLocation(items.map { it.latitude!! }.average(), items.map { it.longitude!! }.average()) }
+  val initialCenter = locatedVehicles.takeIf { it.isNotEmpty() }?.let { items -> MapLocation(items.map { it.latitude!! }.average(), items.map { it.longitude!! }.average()) }
+  var mapCenter by remember(locationSignature) { mutableStateOf(initialCenter) }
   var zoom by remember { mutableIntStateOf(DEFAULT_MAP_ZOOM) }
   var selectedVehicleId by remember { mutableStateOf<String?>(null) }
   var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-  var tiles by remember(locationSignature, zoom) { mutableStateOf<List<RasterTile>>(emptyList()) }
+  var tiles by remember(locationSignature, zoom, mapCenter) { mutableStateOf<List<RasterTile>>(emptyList()) }
   var mapError by remember { mutableStateOf<String?>(null) }
-  val markerTargets = remember(locationSignature, zoom, canvasSize) { mapCenter?.let { markerTargets(locatedVehicles, it, zoom, canvasSize) }.orEmpty() }
+  val markerTargets = remember(locationSignature, zoom, canvasSize, mapCenter) { mapCenter?.let { markerTargets(locatedVehicles, it, zoom, canvasSize) }.orEmpty() }
   val selectedVehicle = locatedVehicles.firstOrNull { it.id == selectedVehicleId } ?: locatedVehicles.firstOrNull()
-  LaunchedEffect(locationSignature, zoom) {
+  LaunchedEffect(locationSignature, zoom, mapCenter) {
     tiles = emptyList(); mapError = null
     if (mapCenter == null) { mapError = "No live vehicle position is available."; return@LaunchedEffect }
-    val center = webMercatorTile(mapCenter.latitude, mapCenter.longitude, zoom)
+    val centerLocation = mapCenter ?: return@LaunchedEffect
+    val center = webMercatorTile(centerLocation.latitude, centerLocation.longitude, zoom)
     val originX = floor(center.x).toInt() - 1
     val originY = floor(center.y).toInt() - 1
     runCatching { (0..2).flatMap { row -> (0..2).map { column -> downloadTile(originX + column, originY + row, zoom) } } }
       .onSuccess { tiles = it }
       .onFailure { mapError = it.message ?: "Unable to load map tiles." }
   }
-  Box(Modifier.fillMaxWidth().height(280.dp)) {
-    Canvas(Modifier.fillMaxWidth().height(280.dp).onSizeChanged { canvasSize = it }.pointerInput(markerTargets) { detectTapGestures { tap -> markerTargets.minByOrNull { (it.offset - tap).getDistance() }?.takeIf { (it.offset - tap).getDistance() <= 28f }?.let { selectedVehicleId = it.vehicle.id } } }.pointerInput(Unit) { var scaleAccumulator = 1f; detectTransformGestures { _, _, scale, _ -> scaleAccumulator *= scale; if (scaleAccumulator > 1.15f && zoom < 19) { zoom++; scaleAccumulator = 1f } else if (scaleAccumulator < 0.87f && zoom > 3) { zoom--; scaleAccumulator = 1f } } }) {
+  Column(modifier) { Box(Modifier.fillMaxWidth().weight(1f)) {
+    Canvas(Modifier.fillMaxSize().onSizeChanged { canvasSize = it }.pointerInput(Unit) { var scaleAccumulator = 1f; detectTransformGestures { _, pan, scale, _ -> val currentCenter = mapCenter; if (currentCenter != null && canvasSize.width > 0) { val tileSize = minOf(canvasSize.width / 3f, canvasSize.height / 3f); val currentTile = webMercatorTile(currentCenter.latitude, currentCenter.longitude, zoom); mapCenter = mapLocationFromTile(TileCoordinate(currentTile.x - pan.x.toDouble() / tileSize, currentTile.y - pan.y.toDouble() / tileSize), zoom) }; scaleAccumulator *= scale; if (scaleAccumulator > 1.15f && zoom < 19) { zoom++; scaleAccumulator = 1f } else if (scaleAccumulator < 0.87f && zoom > 3) { zoom--; scaleAccumulator = 1f } } }.pointerInput(markerTargets) { detectTapGestures { tap -> markerTargets.minByOrNull { (it.offset - tap).getDistance() }?.takeIf { (it.offset - tap).getDistance() <= 32f }?.let { selectedVehicleId = it.vehicle.id } } }) {
       drawRect(Color(0xFFE8EDF2))
       if (mapCenter == null || tiles.isEmpty()) return@Canvas
-      val center = webMercatorTile(mapCenter.latitude, mapCenter.longitude, zoom)
+      val centerLocation = mapCenter ?: return@Canvas
+      val center = webMercatorTile(centerLocation.latitude, centerLocation.longitude, zoom)
       val originX = floor(center.x).toInt() - 1
       val originY = floor(center.y).toInt() - 1
       val tileSize = minOf(size.width / 3f, size.height / 3f)
@@ -124,11 +122,11 @@ class AuthViewModel : ViewModel() {
       for (row in 0..2) for (column in 0..2) {
         tileByCoordinate["${wrapTileX(originX + column, zoom)}:${originY + row}"]?.let { tile -> drawImage(tile.bitmap.asImageBitmap(), dstOffset = IntOffset((left + column * tileSize).toInt(), (top + row * tileSize).toInt()), dstSize = IntSize(tileSize.toInt(), tileSize.toInt())) }
       }
-      markerTargets(locatedVehicles, mapCenter, zoom, IntSize(size.width.toInt(), size.height.toInt())).forEach { marker -> drawCircle(if (marker.vehicle.id == selectedVehicle?.id) Color(0xFFD32F2F) else Color(0xFF1565C0), radius = if (marker.vehicle.id == selectedVehicle?.id) 11f else 8f, center = marker.offset) }
+      markerTargets(locatedVehicles, centerLocation, zoom, IntSize(size.width.toInt(), size.height.toInt())).forEach { marker -> drawCircle(if (marker.vehicle.id == selectedVehicle?.id) Color(0xFFD32F2F) else Color(0xFF1565C0), radius = if (marker.vehicle.id == selectedVehicle?.id) 11f else 8f, center = marker.offset) }
     }
-    selectedVehicle?.let { Surface(Modifier.align(Alignment.TopStart).padding(8.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f), shadowElevation = 2.dp) { Text("${it.registrationNo} · ${it.speed ?: 0.0} km/h\n${it.fixTime ?: "Unknown time"}\nPinch with two fingers to zoom · Tap a marker", modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.labelSmall) } }
+    selectedVehicle?.let { Surface(Modifier.align(Alignment.TopStart).padding(8.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f), shadowElevation = 2.dp) { Text("${it.registrationNo} · ${it.speed ?: 0.0} km/h\n${it.fixTime ?: "Unknown time"}\nDrag to pan · Pinch to zoom · Tap a marker", modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.labelSmall) } }
   }
-  Text(mapError ?: if (tiles.isEmpty()) "Loading live map…" else "Live map · © MapTiler / OpenStreetMap", color = if (mapError == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+  Text(mapError ?: if (tiles.isEmpty()) "Loading live map…" else "Live map · © OpenStreetMap", color = if (mapError == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
 }
 
 private const val DEFAULT_MAP_ZOOM = 15
@@ -136,6 +134,7 @@ private data class TileCoordinate(val x: Double, val y: Double)
 private data class MapLocation(val latitude: Double, val longitude: Double)
 private data class RasterTile(val x: Int, val y: Int, val bitmap: Bitmap)
 private data class MarkerTarget(val vehicle: LiveVehicle, val offset: Offset)
+private fun mapLocationFromTile(tile: TileCoordinate, zoom: Int): MapLocation { val tiles = 1 shl zoom; val longitude = tile.x / tiles * 360.0 - 180.0; val latitude = atan(sinh(PI * (1.0 - 2.0 * tile.y / tiles))) * 180.0 / PI; return MapLocation(latitude, longitude) }
 private fun markerTargets(vehicles: List<LiveVehicle>, center: MapLocation, zoom: Int, size: IntSize): List<MarkerTarget> { if (size == IntSize.Zero) return emptyList(); val centerTile = webMercatorTile(center.latitude, center.longitude, zoom); val originX = floor(centerTile.x).toInt() - 1; val originY = floor(centerTile.y).toInt() - 1; val tileSize = minOf(size.width / 3f, size.height / 3f); val left = (size.width - tileSize * 3) / 2f; val top = (size.height - tileSize * 3) / 2f; return vehicles.mapNotNull { vehicle -> val point = webMercatorTile(vehicle.latitude ?: return@mapNotNull null, vehicle.longitude ?: return@mapNotNull null, zoom); val offset = Offset((left + (point.x - originX) * tileSize).toFloat(), (top + (point.y - originY) * tileSize).toFloat()); if (offset.x in 0f..size.width.toFloat() && offset.y in 0f..size.height.toFloat()) MarkerTarget(vehicle, offset) else null } }
 private fun webMercatorTile(latitude: Double, longitude: Double, zoom: Int): TileCoordinate { val tiles = 1 shl zoom; val latitudeRadians = latitude * PI / 180.0; return TileCoordinate((longitude + 180.0) / 360.0 * tiles, (1.0 - ln(tan(latitudeRadians) + 1.0 / cos(latitudeRadians)) / PI) / 2.0 * tiles) }
 private fun wrapTileX(x: Int, zoom: Int): Int { val tiles = 1 shl zoom; return ((x % tiles) + tiles) % tiles }
