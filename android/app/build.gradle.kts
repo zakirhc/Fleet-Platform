@@ -1,9 +1,7 @@
 plugins { id("com.android.application"); id("org.jetbrains.kotlin.plugin.compose") }
 
-val mapTilerApiKey = providers.gradleProperty("MAPTILER_API_KEY").orElse("")
-
 android { namespace = "com.biapps.fleet"; compileSdk = 37
-  defaultConfig { applicationId = "com.biapps.fleet"; minSdk = 26; targetSdk = 37; versionCode = 1; versionName = "0.1.0"; buildConfigField("String", "API_BASE_URL", "\"${providers.gradleProperty("FLEET_API_BASE_URL").get()}\""); buildConfigField("String", "MAPTILER_API_KEY", "\"${mapTilerApiKey.get()}\"") }
+  defaultConfig { applicationId = "com.biapps.fleet"; minSdk = 26; targetSdk = 37; versionCode = 1; versionName = "0.1.0"; buildConfigField("String", "API_BASE_URL", "\"${providers.gradleProperty("FLEET_API_BASE_URL").get()}\"") }
   buildFeatures { compose = true; buildConfig = true }
 }
 

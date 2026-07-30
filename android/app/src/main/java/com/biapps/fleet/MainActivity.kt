@@ -91,7 +91,6 @@ class AuthViewModel : ViewModel() {
   LaunchedEffect(vehicle?.id, vehicle?.latitude, vehicle?.longitude) {
     tiles = emptyList(); mapError = null
     if (vehicle == null) { mapError = "No live vehicle position is available."; return@LaunchedEffect }
-    if (BuildConfig.MAPTILER_API_KEY.isBlank()) { mapError = "Set MAPTILER_API_KEY in android/gradle.properties."; return@LaunchedEffect }
     val center = webMercatorTile(vehicle.latitude!!, vehicle.longitude!!, MAP_ZOOM)
     val originX = floor(center.x).toInt() - 1
     val originY = floor(center.y).toInt() - 1
@@ -122,7 +121,7 @@ private data class TileCoordinate(val x: Double, val y: Double)
 private data class RasterTile(val x: Int, val y: Int, val bitmap: Bitmap)
 private fun webMercatorTile(latitude: Double, longitude: Double, zoom: Int): TileCoordinate { val tiles = 1 shl zoom; val latitudeRadians = latitude * PI / 180.0; return TileCoordinate((longitude + 180.0) / 360.0 * tiles, (1.0 - ln(tan(latitudeRadians) + 1.0 / cos(latitudeRadians)) / PI) / 2.0 * tiles) }
 private fun wrapTileX(x: Int): Int { val tiles = 1 shl MAP_ZOOM; return ((x % tiles) + tiles) % tiles }
-private suspend fun downloadTile(x: Int, y: Int): RasterTile = withContext(Dispatchers.IO) { val tileX = wrapTileX(x); val connection = (URL("https://api.maptiler.com/maps/streets-v4/$MAP_ZOOM/$tileX/$y.png?key=${BuildConfig.MAPTILER_API_KEY}").openConnection() as HttpURLConnection).apply { connectTimeout = 15_000; readTimeout = 15_000 }; if (connection.responseCode !in 200..299) throw IllegalStateException("Map tiles returned HTTP ${connection.responseCode}."); val bitmap = connection.inputStream.use { BitmapFactory.decodeStream(it) } ?: throw IllegalStateException("Map tile could not be decoded."); RasterTile(tileX, y, bitmap) }
+private suspend fun downloadTile(x: Int, y: Int): RasterTile = withContext(Dispatchers.IO) { val tileX = wrapTileX(x); val connection = (URL("https://tile.openstreetmap.org/$MAP_ZOOM/$tileX/$y.png").openConnection() as HttpURLConnection).apply { connectTimeout = 15_000; readTimeout = 15_000; setRequestProperty("User-Agent", "FleetPlatform-Android/1.0") }; if (connection.responseCode !in 200..299) throw IllegalStateException("Map tiles returned HTTP ${connection.responseCode}."); val bitmap = connection.inputStream.use { BitmapFactory.decodeStream(it) } ?: throw IllegalStateException("Map tile could not be decoded."); RasterTile(tileX, y, bitmap) }
 
 @Composable private fun AlertsScreen(session: Session) {
   var events by remember(session.accessToken) { mutableStateOf<List<GeofenceEvent>>(emptyList()) }
