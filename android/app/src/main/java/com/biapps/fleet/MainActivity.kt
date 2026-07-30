@@ -27,6 +27,7 @@ import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { FleetApp() } }
@@ -94,10 +95,14 @@ class AuthViewModel : ViewModel() {
   }
   AndroidView(
     modifier = Modifier.fillMaxWidth().height(280.dp),
-    factory = { context -> MapLibre.getInstance(context.applicationContext); MapView(context).apply { onCreate(null); onStart(); getMapAsync { loadedMap -> map = loadedMap; loadedMap.setStyle("https://demotiles.maplibre.org/style.json") { mapReady = true } }; mapView = this } },
+    factory = { context -> MapLibre.getInstance(context.applicationContext); MapView(context).apply { onCreate(null); onStart(); getMapAsync { loadedMap -> map = loadedMap; loadedMap.setStyle(Style.Builder().fromJson(OSM_RASTER_STYLE)) { mapReady = true } }; mapView = this } },
   )
   DisposableEffect(mapView) { onDispose { mapView?.onStop(); mapView?.onDestroy() } }
 }
+
+private const val OSM_RASTER_STYLE = """
+{"version":8,"sources":{"openstreetmap":{"type":"raster","tiles":["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],"tileSize":256,"attribution":"© OpenStreetMap contributors","maxzoom":19}},"layers":[{"id":"openstreetmap","type":"raster","source":"openstreetmap"}]}
+"""
 
 @Composable private fun AlertsScreen(session: Session) {
   var events by remember(session.accessToken) { mutableStateOf<List<GeofenceEvent>>(emptyList()) }
