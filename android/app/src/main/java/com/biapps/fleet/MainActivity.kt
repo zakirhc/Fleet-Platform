@@ -87,6 +87,7 @@ class AuthViewModel : ViewModel() {
   var mapReady by remember { mutableStateOf(false) }
   var mapError by remember { mutableStateOf<String?>(null) }
   var mapStatus by remember { mutableStateOf("Starting native map…") }
+  var mapRequested by remember { mutableStateOf(false) }
   LaunchedEffect(map, mapReady, vehicles) {
     val activeMap = map ?: return@LaunchedEffect
     if (!mapReady) return@LaunchedEffect
@@ -104,7 +105,7 @@ class AuthViewModel : ViewModel() {
   Column {
     AndroidView(
       modifier = Modifier.fillMaxWidth().height(280.dp),
-      factory = { context -> MapLibre.getInstance(context.applicationContext, BuildConfig.MAPTILER_API_KEY, WellKnownTileServer.MapTiler); MapView(context, MapLibreMapOptions().textureMode(true)).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); getMapAsync { loadedMap -> map = loadedMap; mapStatus = "Map engine ready — loading style…"; loadedMap.setStyle(mapStyle()) { mapReady = true; mapStatus = "Map style loaded" } }; mapStatus = "Map view created — waiting for Android lifecycle…"; mapView = this } },
+      factory = { context -> MapLibre.getInstance(context.applicationContext, BuildConfig.MAPTILER_API_KEY, WellKnownTileServer.MapTiler); MapView(context, MapLibreMapOptions().textureMode(true)).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); mapStatus = "Map view created — waiting for Android lifecycle…"; mapView = this } },
     )
     Text(mapError?.let { "Map error: $it" } ?: mapStatus, color = if (mapError == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
   }
@@ -122,6 +123,15 @@ class AuthViewModel : ViewModel() {
     lifecycleOwner.lifecycle.addObserver(observer)
     if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) view.onStart()
     if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) view.onResume()
+    if (!mapRequested) {
+      mapRequested = true
+      mapStatus = "Map lifecycle active — requesting map…"
+      view.getMapAsync { loadedMap ->
+        map = loadedMap
+        mapStatus = "Map engine ready — loading style…"
+        loadedMap.setStyle(mapStyle()) { mapReady = true; mapStatus = "Map style loaded" }
+      }
+    }
     onDispose { lifecycleOwner.lifecycle.removeObserver(observer); view.onPause(); view.onStop(); view.onDestroy() }
   }
 }
