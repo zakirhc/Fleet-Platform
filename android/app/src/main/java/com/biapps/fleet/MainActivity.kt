@@ -16,6 +16,7 @@ import com.biapps.fleet.data.Session
 import com.biapps.fleet.data.Vehicle
 import com.biapps.fleet.data.Driver
 import com.biapps.fleet.data.GeofenceEvent
+import com.biapps.fleet.data.LiveVehicle
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -43,8 +44,25 @@ class AuthViewModel : ViewModel() {
 @Composable private fun DispatcherHome(session: Session, logout: () -> Unit) {
   MaterialTheme { var page by remember { mutableStateOf("Fleet") }
     Scaffold(bottomBar = { NavigationBar { listOf("Fleet", "Drivers", "Map", "Alerts").forEach { item -> NavigationBarItem(selected = page == item, onClick = { page = item }, icon = {}, label = { Text(item) }) } } }) { padding ->
-      Column(Modifier.padding(padding).padding(24.dp)) { Text("Fleet Platform", style = MaterialTheme.typography.headlineMedium); Spacer(Modifier.height(8.dp)); Text("Signed in as ${session.username}"); Spacer(Modifier.height(12.dp)); when (page) { "Fleet" -> FleetScreen(session); "Drivers" -> DriversScreen(session); "Alerts" -> AlertsScreen(session); else -> Text("$page will use the Fleet v1 API.") }; Spacer(Modifier.height(16.dp)); TextButton(onClick = logout) { Text("Sign out") } }
+      Column(Modifier.padding(padding).padding(24.dp)) { Text("Fleet Platform", style = MaterialTheme.typography.headlineMedium); Spacer(Modifier.height(8.dp)); Text("Signed in as ${session.username}"); Spacer(Modifier.height(12.dp)); when (page) { "Fleet" -> FleetScreen(session); "Drivers" -> DriversScreen(session); "Map" -> LiveLocationsScreen(session); "Alerts" -> AlertsScreen(session) }; Spacer(Modifier.height(16.dp)); TextButton(onClick = logout) { Text("Sign out") } }
     }
+  }
+}
+
+@Composable private fun LiveLocationsScreen(session: Session) {
+  var vehicles by remember(session.accessToken) { mutableStateOf<List<LiveVehicle>>(emptyList()) }
+  var loading by remember(session.accessToken) { mutableStateOf(true) }
+  var error by remember(session.accessToken) { mutableStateOf<String?>(null) }
+  var reload by remember(session.accessToken) { mutableIntStateOf(0) }
+  suspend fun load() { loading = true; error = null; runCatching { FleetApi().latestPositions(session.accessToken) }.onSuccess { vehicles = it }.onFailure { error = it.message ?: "Unable to load live locations." }; loading = false }
+  LaunchedEffect(session.accessToken, reload) { load() }
+  Text("Live locations", style = MaterialTheme.typography.titleLarge)
+  TextButton(onClick = { reload++ }, enabled = !loading) { Text("Refresh") }
+  when {
+    loading -> CircularProgressIndicator()
+    error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
+    vehicles.isEmpty() -> Text("No vehicles with assigned tracking devices were found.")
+    else -> LazyColumn(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(vehicles, key = { it.id }) { vehicle -> Card { Column(Modifier.fillMaxWidth().padding(16.dp)) { Text(vehicle.registrationNo, style = MaterialTheme.typography.titleMedium); if (vehicle.latitude == null || vehicle.longitude == null) Text("No location received yet") else { Text("${"%.5f".format(vehicle.latitude)}, ${"%.5f".format(vehicle.longitude)}"); Text("${vehicle.speed ?: 0.0} km/h · ${vehicle.fixTime ?: "Unknown time"}", style = MaterialTheme.typography.labelLarge) } } } } }
   }
 }
 

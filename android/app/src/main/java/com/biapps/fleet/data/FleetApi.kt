@@ -12,6 +12,7 @@ data class Session(val accessToken: String, val refreshToken: String, val userna
 data class Vehicle(val id: String, val registrationNo: String, val fleetNo: String?, val make: String?, val model: String?, val status: String)
 data class Driver(val id: String, val fullName: String, val employeeNo: String?, val mobile: String?, val designation: String?, val status: String)
 data class GeofenceEvent(val id: String, val eventType: String, val eventTime: String, val registrationNo: String?, val geofenceName: String?)
+data class LiveVehicle(val id: String, val registrationNo: String, val latitude: Double?, val longitude: Double?, val speed: Double?, val fixTime: String?)
 
 class FleetApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/')) {
   suspend fun login(username: String, password: String): Session = request("/auth/login", JSONObject().put("username", username).put("password", password)).let { data ->
@@ -59,6 +60,22 @@ class FleetApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/
           eventTime = event.optString("eventTime"),
           registrationNo = event.optString("registrationNo").takeIf { it.isNotBlank() },
           geofenceName = event.optString("geofenceName").takeIf { it.isNotBlank() },
+        )
+      }
+    }
+  }
+
+  suspend fun latestPositions(accessToken: String): List<LiveVehicle> = get("/tracking/positions", accessToken).let { vehicles ->
+    (0 until vehicles.length()).map { index ->
+      vehicles.getJSONObject(index).let { vehicle ->
+        val position = vehicle.optJSONObject("position")
+        LiveVehicle(
+          id = vehicle.getString("vehicleId"),
+          registrationNo = vehicle.getString("registrationNo"),
+          latitude = position?.optDouble("latitude")?.takeUnless { it.isNaN() },
+          longitude = position?.optDouble("longitude")?.takeUnless { it.isNaN() },
+          speed = position?.optDouble("speed")?.takeUnless { it.isNaN() },
+          fixTime = position?.optString("fixTime")?.takeIf { it.isNotBlank() },
         )
       }
     }
