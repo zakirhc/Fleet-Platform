@@ -32,4 +32,4 @@
 
 - [x] Stable v1.0.1 web release tag and refresh-token API.
 - [x] Registered mobile devices and Firebase Cloud Messaging delivery foundation.
-- [ ] Android dispatcher application: live map, fleet status, route playback, and alerts.
+- [ ] Android dispatcher application: project scaffold complete; login, live map, fleet status, route playback, and alerts remain.
