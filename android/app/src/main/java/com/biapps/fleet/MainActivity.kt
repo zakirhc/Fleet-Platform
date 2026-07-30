@@ -97,11 +97,11 @@ class AuthViewModel : ViewModel() {
   Column {
     AndroidView(
       modifier = Modifier.fillMaxWidth().height(280.dp),
-      factory = { context -> MapLibre.getInstance(context.applicationContext); MapView(context).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); onStart(); getMapAsync { loadedMap -> map = loadedMap; loadedMap.setStyle(Style.Builder().fromJson(OSM_RASTER_STYLE)) { mapReady = true } }; mapView = this } },
+      factory = { context -> MapLibre.getInstance(context.applicationContext); MapView(context).apply { addOnDidFailLoadingMapListener(object : MapView.OnDidFailLoadingMapListener { override fun onDidFailLoadingMap(errorMessage: String) { mapError = errorMessage } }); onCreate(null); onStart(); onResume(); getMapAsync { loadedMap -> map = loadedMap; loadedMap.setStyle(Style.Builder().fromJson(OSM_RASTER_STYLE)) { mapReady = true } }; mapView = this } },
     )
     mapError?.let { Text("Map error: $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
   }
-  DisposableEffect(mapView) { onDispose { mapView?.onStop(); mapView?.onDestroy() } }
+  DisposableEffect(mapView) { onDispose { mapView?.onPause(); mapView?.onStop(); mapView?.onDestroy() } }
 }
 
 private const val OSM_RASTER_STYLE = """
