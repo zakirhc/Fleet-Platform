@@ -20,6 +20,8 @@ import { ReportModule } from './report/report.module';
 import { DocumentModule } from './document/document.module';
 import { MobileModule } from './mobile/mobile.module';
 import appConfig from './config/app.config';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 @Module({
   imports: [
@@ -57,5 +59,7 @@ import appConfig from './config/app.config';
     DocumentModule,
     MobileModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

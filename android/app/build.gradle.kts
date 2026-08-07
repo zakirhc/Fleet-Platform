@@ -1,7 +1,7 @@
 plugins { id("com.android.application"); id("org.jetbrains.kotlin.plugin.compose") }
 
 android { namespace = "com.biapps.fleet"; compileSdk = 37
-  defaultConfig { applicationId = "com.biapps.fleet"; minSdk = 26; targetSdk = 37; versionCode = 1; versionName = "0.1.0"; buildConfigField("String", "API_BASE_URL", "\"${providers.gradleProperty("FLEET_API_BASE_URL").get()}\"") }
+  defaultConfig { applicationId = "com.biapps.fleet"; minSdk = 26; targetSdk = 37; versionCode = 10000; versionName = "1.0.0"; buildConfigField("String", "API_BASE_URL", "\"${providers.gradleProperty("FLEET_API_BASE_URL").get()}\"") }
   buildFeatures { compose = true; buildConfig = true }
 }
 

@@ -7,6 +7,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,10 +30,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.Dispatchers
@@ -57,20 +65,29 @@ class AuthViewModel : ViewModel() {
   fun logout() { session = null }
 }
 
+private val FleetColors = lightColorScheme(primary = Color(0xFF008F83), onPrimary = Color.White, primaryContainer = Color(0xFFD8F6F0), onPrimaryContainer = Color(0xFF003D38), secondary = Color(0xFF2F6477), background = Color(0xFFF4F7F9), surface = Color.White, surfaceVariant = Color(0xFFE9EFF3), onSurface = Color(0xFF132337), onSurfaceVariant = Color(0xFF66788C), outline = Color(0xFFD7E0E7), error = Color(0xFFBA1A1A))
+private val FleetTypography = Typography(headlineLarge = TextStyle(fontSize = 38.sp, lineHeight = 42.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp), headlineMedium = TextStyle(fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.6).sp), titleLarge = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold), titleMedium = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold), labelLarge = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold))
+
 @Composable private fun FleetApp(auth: AuthViewModel = viewModel()) {
-  MaterialTheme { if (auth.session == null) LoginScreen(auth) else DispatcherHome(auth.session!!, auth::logout) }
+  MaterialTheme(colorScheme = FleetColors, typography = FleetTypography, shapes = Shapes(small = RoundedCornerShape(10.dp), medium = RoundedCornerShape(16.dp), large = RoundedCornerShape(24.dp))) { if (auth.session == null) LoginScreen(auth) else DispatcherHome(auth.session!!, auth::logout) }
 }
 
 @Composable private fun LoginScreen(auth: AuthViewModel) { var username by remember { mutableStateOf("") }; var password by remember { mutableStateOf("") }
-  Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { Text("Fleet Platform", style = MaterialTheme.typography.headlineMedium); Text("Dispatcher sign in"); OutlinedTextField(username, { username = it }, label = { Text("Username") }, singleLine = true); OutlinedTextField(password, { password = it }, label = { Text("Password") }, singleLine = true); auth.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }; Button(onClick = { auth.login(username, password) }, enabled = username.isNotBlank() && password.isNotBlank() && !auth.loading) { Text(if (auth.loading) "Signing in…" else "Sign in") } }
+  Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF061A2D), Color(0xFF0A3042))))) {
+    Box(Modifier.size(260.dp).offset(x = (-100).dp, y = (-90).dp).background(Color(0x2234D6C2), CircleShape))
+    Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 38.dp)) {
+      Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(42.dp).background(Color(0xFF34D6C2), RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) { Text("F", color = Color(0xFF052B2A), fontWeight = FontWeight.Black, fontSize = 20.sp) }; Spacer(Modifier.width(12.dp)); Text("Fleet", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp); Text("Platform", color = Color(0xFF45D8C6), fontWeight = FontWeight.Bold, fontSize = 20.sp) }
+      Spacer(Modifier.height(42.dp)); Text("Your fleet.\nIn perfect motion.", color = Color.White, style = MaterialTheme.typography.headlineLarge); Spacer(Modifier.height(12.dp)); Text("Live visibility and smarter operations, wherever the road takes you.", color = Color(0xFFADC1D0), lineHeight = 22.sp)
+      Spacer(Modifier.height(32.dp)); Card(colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(10.dp), shape = RoundedCornerShape(24.dp)) { Column(Modifier.fillMaxWidth().padding(24.dp)) { Text("WELCOME BACK", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp); Spacer(Modifier.height(7.dp)); Text("Sign in", style = MaterialTheme.typography.headlineMedium); Text("Access your secure fleet workspace", color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(20.dp)); OutlinedTextField(username, { username = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Username") }, singleLine = true, shape = RoundedCornerShape(12.dp)); Spacer(Modifier.height(12.dp)); OutlinedTextField(password, { password = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Password") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), shape = RoundedCornerShape(12.dp)); auth.error?.let { Spacer(Modifier.height(10.dp)); Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }; Spacer(Modifier.height(20.dp)); Button(onClick = { auth.login(username, password) }, modifier = Modifier.fillMaxWidth().height(50.dp), enabled = username.isNotBlank() && password.isNotBlank() && !auth.loading, shape = RoundedCornerShape(12.dp)) { Text(if (auth.loading) "Signing in…" else "Sign in  →") } } }
+    }
+  }
 }
 
 @Composable private fun DispatcherHome(session: Session, logout: () -> Unit) {
-  MaterialTheme { var page by remember { mutableStateOf("Fleet") }
-    Scaffold(bottomBar = { NavigationBar { listOf("Fleet", "Drivers", "Map", "Alerts").forEach { item -> NavigationBarItem(selected = page == item, onClick = { page = item }, icon = {}, label = { Text(item) }) } } }) { padding ->
-      Column(Modifier.fillMaxSize().padding(padding).padding(24.dp)) { Text("Fleet Platform", style = MaterialTheme.typography.headlineMedium); Spacer(Modifier.height(8.dp)); Text("Signed in as ${session.username}"); TextButton(onClick = logout) { Text("Sign out") }; Spacer(Modifier.height(12.dp)); when (page) { "Fleet" -> FleetScreen(session); "Drivers" -> DriversScreen(session); "Map" -> LiveLocationsScreen(session, Modifier.weight(1f)); "Alerts" -> AlertsScreen(session) } }
+  var page by remember { mutableStateOf("Fleet") }
+    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = { Surface(color = Color(0xFF071A2D), shadowElevation = 8.dp) { Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(34.dp).background(Color(0xFF34D6C2), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) { Text("F", color = Color(0xFF052B2A), fontWeight = FontWeight.Black) }; Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text("FleetPlatform", color = Color.White, fontWeight = FontWeight.Bold); Text("COMMAND CENTRE", color = Color(0xFF7FA0B7), fontSize = 9.sp, letterSpacing = 1.sp) }; TextButton(onClick = logout) { Text("Sign out", color = Color(0xFFBBD0DD)) } } } }, bottomBar = { NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) { listOf("Fleet" to "●", "Drivers" to "◆", "Map" to "◎", "Alerts" to "!").forEach { (item, symbol) -> NavigationBarItem(selected = page == item, onClick = { page = item }, icon = { Text(symbol, fontWeight = FontWeight.Bold) }, label = { Text(item) }, colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer)) } } }) { padding ->
+      Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp, vertical = 22.dp)) { Row(verticalAlignment = Alignment.Bottom) { Column(Modifier.weight(1f)) { Text("COMPANY WORKSPACE", color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp); Text(page, style = MaterialTheme.typography.headlineMedium) }; Column(horizontalAlignment = Alignment.End) { Text("Signed in as", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp); Text(session.username, fontWeight = FontWeight.SemiBold, fontSize = 12.sp) } }; Spacer(Modifier.height(20.dp)); when (page) { "Fleet" -> FleetScreen(session); "Drivers" -> DriversScreen(session); "Map" -> LiveLocationsScreen(session, Modifier.weight(1f)); "Alerts" -> AlertsScreen(session) } }
   }
-}
 }
 
 @Composable private fun LiveLocationsScreen(session: Session, modifier: Modifier = Modifier) {
@@ -122,7 +139,7 @@ class AuthViewModel : ViewModel() {
       for (row in 0..2) for (column in 0..2) {
         tileByCoordinate["${wrapTileX(originX + column, zoom)}:${originY + row}"]?.let { tile -> drawImage(tile.bitmap.asImageBitmap(), dstOffset = IntOffset((left + column * tileSize).toInt(), (top + row * tileSize).toInt()), dstSize = IntSize(tileSize.toInt(), tileSize.toInt())) }
       }
-      markerTargets(locatedVehicles, centerLocation, zoom, IntSize(size.width.toInt(), size.height.toInt())).forEach { marker -> drawCircle(if (marker.vehicle.id == selectedVehicle?.id) Color(0xFFD32F2F) else Color(0xFF1565C0), radius = if (marker.vehicle.id == selectedVehicle?.id) 11f else 8f, center = marker.offset) }
+      markerTargets(locatedVehicles, centerLocation, zoom, IntSize(size.width.toInt(), size.height.toInt())).forEach { marker -> drawCircle(Color.White, radius = if (marker.vehicle.id == selectedVehicle?.id) 14f else 11f, center = marker.offset); drawCircle(if (marker.vehicle.id == selectedVehicle?.id) Color(0xFFFF6B4A) else Color(0xFF008F83), radius = if (marker.vehicle.id == selectedVehicle?.id) 10f else 7f, center = marker.offset) }
     }
     selectedVehicle?.let { Surface(Modifier.align(Alignment.TopStart).padding(8.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f), shadowElevation = 2.dp) { Text("${it.registrationNo} · ${it.speed ?: 0.0} km/h\n${it.fixTime ?: "Unknown time"}\nDrag to pan · Pinch to zoom · Tap a marker", modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.labelSmall) } }
   }

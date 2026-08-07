@@ -13,10 +13,6 @@ import {
   {
     catch(exception: unknown, host: ArgumentsHost) {
 
-      console.error('========== EXCEPTION ==========');
-      console.error(exception);
-      console.error('===============================');
-
       const ctx = host.switchToHttp();
   
       const response = ctx.getResponse<Response>();
@@ -26,6 +22,12 @@ import {
         exception instanceof HttpException
           ? exception.getStatus()
           : HttpStatus.INTERNAL_SERVER_ERROR;
+
+      if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+        console.error('========== EXCEPTION ==========');
+        console.error(exception);
+        console.error('===============================');
+      }
   
       const message =
         exception instanceof HttpException

@@ -1,7 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 
 import * as argon2 from 'argon2';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 
 import { UserRepository } from './user.repository';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -29,7 +29,7 @@ export class UserService {
     const passwordHash = await argon2.hash(dto.password);
 
     return this.repository.create({
-      uuid: uuid(),
+      uuid: randomUUID(),
       companyId,
       username: dto.username,
       email: dto.email,

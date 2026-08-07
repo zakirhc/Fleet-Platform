@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 
 import { CompanyRepository } from '../repositories/company.repository';
 import { CreateCompanyDto } from '../dto/create-company.dto';
@@ -21,7 +21,7 @@ export class CompanyService {
     }
 
     return this.repository.create({
-      uuid: uuidv4(),
+      uuid: randomUUID(),
       ...dto,
     });
   }

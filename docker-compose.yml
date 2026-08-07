@@ -19,10 +19,6 @@ services:
     env_file: .env.docker
     environment:
       CONFIG_USE_ENVIRONMENT_VARIABLES: "true"
-      DATABASE_DRIVER: ${TRACCAR_DATABASE_DRIVER:?Set TRACCAR_DATABASE_DRIVER in .env.docker}
-      DATABASE_URL: ${TRACCAR_DATABASE_URL:?Set TRACCAR_DATABASE_URL in .env.docker}
-      DATABASE_USER: ${TRACCAR_DATABASE_USER:?Set TRACCAR_DATABASE_USER in .env.docker}
-      DATABASE_PASSWORD: ${TRACCAR_DATABASE_PASSWORD:?Set TRACCAR_DATABASE_PASSWORD in .env.docker}
     depends_on:
       mysql:
         condition: service_healthy
@@ -41,6 +37,8 @@ services:
       context: ./backend
     restart: unless-stopped
     env_file: .env.docker
+    ports:
+      - "3000:3000"
     depends_on:
       mysql:
         condition: service_healthy

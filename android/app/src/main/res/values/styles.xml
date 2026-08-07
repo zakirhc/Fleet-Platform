@@ -1,1 +1,9 @@
-<resources><style name="Theme.Fleet" parent="android:style/Theme.Material.Light.NoActionBar" /></resources>
+<resources>
+    <style name="Theme.Fleet" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#071A2D</item>
+        <item name="android:navigationBarColor">#FFFFFF</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>
